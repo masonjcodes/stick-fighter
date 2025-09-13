@@ -133,6 +133,10 @@
             background: rgba(0, 255, 0, 0.3);
         }
 
+        .player4 {
+            background: rgba(101, 67, 33, 0.5);
+        }
+
         .health-bar {
             width: 100%;
             height: 20px;
@@ -227,6 +231,7 @@
             <h3>Select Number of Players:</h3>
             <button class="menu-button" onclick="selectPlayerCount(2)">2 Players</button>
             <button class="menu-button" onclick="selectPlayerCount(3)">3 Players</button>
+            <button class="menu-button" onclick="selectPlayerCount(4)">4 Players (with AI)</button>
         </div>
         <div class="map-selection" style="display: none;" id="mapSelection">
             <h3>Select Map:</h3>
@@ -269,6 +274,13 @@
                 </div>
                 <div class="weapon-indicator" id="weapon3">Sword</div>
             </div>
+            <div class="player-info player4" id="player4Info" style="display: none;">
+                <div>Player 4 (AI)</div>
+                <div class="health-bar">
+                    <div class="health-fill" id="health4"></div>
+                </div>
+                <div class="weapon-indicator" id="weapon4">Sword</div>
+            </div>
         </div>
         <canvas id="gameCanvas" width="1000" height="500"></canvas>
         <div class="controls">
@@ -296,6 +308,11 @@
                 <div><span class="key">U</span> Switch Weapon</div>
                 <div><span class="key">O</span> Hold to Aim Bow</div>
             </div>
+            <div class="control-section" id="player4Controls" style="display: none;">
+                <h3>Player 4 (Brown)</h3>
+                <div>AI Controlled</div>
+                <div>Automatically fights</div>
+            </div>
         </div>
     </div>
 
@@ -316,6 +333,7 @@
         let platforms = [];
         let playerCount = 2;
         let player3 = null;
+        let player4 = null;
         
         // Platform class for platform maps
         class Platform {
@@ -597,6 +615,25 @@
             }
 
             update() {
+                // Don't update if dead
+                if (this.health <= 0) {
+                    this.velocityX = 0;
+                    this.attacking = false;
+                    this.isAiming = false;
+                    // Still apply gravity so dead players fall to ground
+                    if (!this.onGround) {
+                        this.velocityY += 0.65;
+                    }
+                    this.y += this.velocityY;
+                    // Ground collision for dead players
+                    if (this.y + this.height >= groundY) {
+                        this.y = groundY - this.height;
+                        this.velocityY = 0;
+                        this.onGround = true;
+                    }
+                    return;
+                }
+
                 // Apply gravity (balanced for good jump feel)
                 if (!this.onGround) {
                     this.velocityY += 0.65;
@@ -695,6 +732,8 @@
                 ctx.fill();
 
                 // Draw stick figure body
+                const opacity = this.health <= 0 ? 0.3 : 1;
+                ctx.globalAlpha = opacity;
                 ctx.strokeStyle = this.stunned ? 'gray' : this.color;
                 ctx.lineWidth = 3;
                 ctx.lineCap = 'round';
@@ -854,7 +893,7 @@
             }
             
             shootBow(target) {
-                if (this.bowCooldown > 0) return;
+                if (this.bowCooldown > 0 || this.health <= 0) return;
                 
                 // Calculate direction to target
                 const dx = (target.x + target.width/2) - (this.x + this.width/2);
@@ -881,27 +920,27 @@
             }
 
             jump() {
-                if (this.onGround && !this.stunned) {
+                if (this.onGround && !this.stunned && this.health > 0) {
                     this.velocityY = -this.jumpPower;
                 }
             }
 
             moveLeft() {
-                if (!this.stunned) {
+                if (!this.stunned && this.health > 0) {
                     this.velocityX = -this.speed;
                     this.facing = -1;
                 }
             }
 
             moveRight() {
-                if (!this.stunned) {
+                if (!this.stunned && this.health > 0) {
                     this.velocityX = this.speed;
                     this.facing = 1;
                 }
             }
 
             attack() {
-                if (this.attackCooldown === 0 && !this.attacking && !this.stunned) {
+                if (this.attackCooldown === 0 && !this.attacking && !this.stunned && this.health > 0) {
                     this.attacking = true;
                     this.attackCooldown = weapons[this.currentWeapon].cooldown / 10;
                 }
@@ -968,7 +1007,7 @@
             bow: '.'
         });
 
-        // Player 3 will be created when 3-player mode is selected
+        // Player 3 and 4 will be created when their modes are selected
 
         // Input handling
         const keys = {};
@@ -987,7 +1026,7 @@
                 document.getElementById('weapon2').textContent =
                     player2.currentWeapon.charAt(0).toUpperCase() + player2.currentWeapon.slice(1);
             }
-            if (playerCount === 3 && player3 && e.key.toLowerCase() === player3.controls.switchWeapon) {
+            if (playerCount >= 3 && player3 && e.key.toLowerCase() === player3.controls.switchWeapon) {
                 player3.switchWeapon();
                 document.getElementById('weapon3').textContent =
                     player3.currentWeapon.charAt(0).toUpperCase() + player3.currentWeapon.slice(1);
@@ -1000,13 +1039,14 @@
 
         function getNearestTarget(shooter) {
             const players = [player1, player2];
-            if (playerCount === 3 && player3) players.push(player3);
+            if (playerCount >= 3 && player3) players.push(player3);
+            if (playerCount === 4 && player4) players.push(player4);
 
             let nearestTarget = null;
             let minDistance = Infinity;
 
             for (const player of players) {
-                if (player === shooter) continue;
+                if (player === shooter || player.health <= 0) continue;
 
                 const dx = player.x - shooter.x;
                 const dy = player.y - shooter.y;
@@ -1019,6 +1059,52 @@
             }
 
             return nearestTarget;
+        }
+
+        function updateAI() {
+            if (!player4 || !player4.isAI || player4.health <= 0) return;
+
+            const target = getNearestTarget(player4);
+            if (!target) return;
+
+            const dx = target.x - player4.x;
+            const dy = target.y - player4.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Movement AI
+            if (distance > 100) {
+                // Move towards nearest enemy
+                if (dx > 10) {
+                    player4.moveRight();
+                } else if (dx < -10) {
+                    player4.moveLeft();
+                }
+            }
+
+            // Jump if target is above
+            if (dy < -50 && player4.onGround && Math.random() < 0.1) {
+                player4.jump();
+            }
+
+            // Combat AI
+            if (distance < 80) {
+                // Attack when close
+                if (Math.random() < 0.15) {
+                    player4.attack();
+                }
+            } else if (distance < 300 && distance > 150) {
+                // Use bow at medium range
+                if (player4.bowCooldown <= 0 && Math.random() < 0.05) {
+                    player4.shootBow(target);
+                }
+            }
+
+            // Randomly switch weapons
+            if (Math.random() < 0.005) {
+                player4.switchWeapon();
+                document.getElementById('weapon4').textContent =
+                    player4.currentWeapon.charAt(0).toUpperCase() + player4.currentWeapon.slice(1);
+            }
         }
 
         function handleInput() {
@@ -1057,7 +1143,7 @@
             }
 
             // Player 3 controls (if active)
-            if (playerCount === 3 && player3) {
+            if (playerCount >= 3 && player3) {
                 if (keys[player3.controls.jump]) player3.jump();
                 if (keys[player3.controls.left]) player3.moveLeft();
                 if (keys[player3.controls.right]) player3.moveRight();
@@ -1078,7 +1164,8 @@
 
         function checkCollisions() {
             const players = [player1, player2];
-            if (playerCount === 3 && player3) players.push(player3);
+            if (playerCount >= 3 && player3) players.push(player3);
+            if (playerCount === 4 && player4) players.push(player4);
 
             // Check weapon collisions for all players
             for (let i = 0; i < players.length; i++) {
@@ -1128,7 +1215,8 @@
         
         function checkPlayerCollision() {
             const players = [player1, player2];
-            if (playerCount === 3 && player3) players.push(player3);
+            if (playerCount >= 3 && player3) players.push(player3);
+            if (playerCount === 4 && player4) players.push(player4);
 
             // Check collisions between all pairs of players
             for (let i = 0; i < players.length; i++) {
@@ -1177,8 +1265,11 @@
         function updateHealthBars() {
             document.getElementById('health1').style.width = `${(player1.health / player1.maxHealth) * 100}%`;
             document.getElementById('health2').style.width = `${(player2.health / player2.maxHealth) * 100}%`;
-            if (playerCount === 3 && player3) {
+            if (playerCount >= 3 && player3) {
                 document.getElementById('health3').style.width = `${(player3.health / player3.maxHealth) * 100}%`;
+            }
+            if (playerCount === 4 && player4) {
+                document.getElementById('health4').style.width = `${(player4.health / player4.maxHealth) * 100}%`;
             }
         }
 
@@ -1186,7 +1277,8 @@
             const alivePlayers = [];
             if (player1.health > 0) alivePlayers.push('Player 1');
             if (player2.health > 0) alivePlayers.push('Player 2');
-            if (playerCount === 3 && player3 && player3.health > 0) alivePlayers.push('Player 3');
+            if (playerCount >= 3 && player3 && player3.health > 0) alivePlayers.push('Player 3');
+            if (playerCount === 4 && player4 && player4.health > 0) alivePlayers.push('Player 4 (AI)');
 
             if (alivePlayers.length <= 1) {
                 gameRunning = false;
@@ -1202,7 +1294,7 @@
             document.getElementById('mapSelection').style.display = 'block';
 
             // Create player 3 if needed
-            if (playerCount === 3) {
+            if (playerCount >= 3) {
                 player3 = new Player(500, '#228B22', {
                     jump: 'i',
                     left: 'j',
@@ -1211,6 +1303,20 @@
                     switchWeapon: 'u',
                     bow: 'o'
                 });
+            }
+
+            // Create player 4 (AI) if needed
+            if (playerCount === 4) {
+                player4 = new Player(700, '#654321', {
+                    // AI doesn't use keyboard controls
+                    jump: '',
+                    left: '',
+                    right: '',
+                    attack: '',
+                    switchWeapon: '',
+                    bow: ''
+                });
+                player4.isAI = true;
             }
         }
 
@@ -1227,13 +1333,21 @@
             document.getElementById('mainMenu').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'block';
 
-            // Show/hide player 3 UI elements
-            if (playerCount === 3) {
+            // Show/hide player 3 and 4 UI elements
+            if (playerCount >= 3) {
                 document.getElementById('player3Info').style.display = 'block';
                 document.getElementById('player3Controls').style.display = 'block';
             } else {
                 document.getElementById('player3Info').style.display = 'none';
                 document.getElementById('player3Controls').style.display = 'none';
+            }
+
+            if (playerCount === 4) {
+                document.getElementById('player4Info').style.display = 'block';
+                document.getElementById('player4Controls').style.display = 'block';
+            } else {
+                document.getElementById('player4Info').style.display = 'none';
+                document.getElementById('player4Controls').style.display = 'none';
             }
 
             // Initialize map
@@ -1271,9 +1385,9 @@
             player2.hitConfirmed = false;
 
             // Reset player 3 if active
-            if (playerCount === 3 && player3) {
+            if (playerCount >= 3 && player3) {
                 player3.health = player3.maxHealth;
-                player3.x = 500;
+                player3.x = playerCount === 4 ? 300 : 500;
                 player3.y = groundY - 100;
                 player3.velocityX = 0;
                 player3.velocityY = 0;
@@ -1281,6 +1395,19 @@
                 player3.attacking = false;
                 player3.attackAngle = 0;
                 player3.hitConfirmed = false;
+            }
+
+            // Reset player 4 if active
+            if (playerCount === 4 && player4) {
+                player4.health = player4.maxHealth;
+                player4.x = 700;
+                player4.y = groundY - 100;
+                player4.velocityX = 0;
+                player4.velocityY = 0;
+                player4.stunned = false;
+                player4.attacking = false;
+                player4.attackAngle = 0;
+                player4.hitConfirmed = false;
             }
             
             // Clear projectiles and effects
@@ -1328,9 +1455,9 @@
             player2.hitConfirmed = false;
 
             // Reset player 3 if active
-            if (playerCount === 3 && player3) {
+            if (playerCount >= 3 && player3) {
                 player3.health = player3.maxHealth;
-                player3.x = 500;
+                player3.x = playerCount === 4 ? 300 : 500;
                 player3.y = groundY - 100;
                 player3.velocityX = 0;
                 player3.velocityY = 0;
@@ -1338,6 +1465,19 @@
                 player3.attacking = false;
                 player3.attackAngle = 0;
                 player3.hitConfirmed = false;
+            }
+
+            // Reset player 4 if active
+            if (playerCount === 4 && player4) {
+                player4.health = player4.maxHealth;
+                player4.x = 700;
+                player4.y = groundY - 100;
+                player4.velocityX = 0;
+                player4.velocityY = 0;
+                player4.stunned = false;
+                player4.attacking = false;
+                player4.attackAngle = 0;
+                player4.hitConfirmed = false;
             }
             
             // Clear projectiles and effects
@@ -1393,11 +1533,19 @@
             // Handle input
             handleInput();
 
+            // Update AI
+            if (playerCount === 4) {
+                updateAI();
+            }
+
             // Update players
             player1.update();
             player2.update();
-            if (playerCount === 3 && player3) {
+            if (playerCount >= 3 && player3) {
                 player3.update();
+            }
+            if (playerCount === 4 && player4) {
+                player4.update();
             }
             
             // Update projectiles
@@ -1423,8 +1571,11 @@
             // Draw players
             player1.draw();
             player2.draw();
-            if (playerCount === 3 && player3) {
+            if (playerCount >= 3 && player3) {
                 player3.draw();
+            }
+            if (playerCount === 4 && player4) {
+                player4.draw();
             }
 
             // Draw targeting indicators
@@ -1436,9 +1587,13 @@
                 const target = playerCount === 3 ? getNearestTarget(player2) : player1;
                 drawTargetingLine(player2, target);
             }
-            if (playerCount === 3 && player3 && player3.isAiming) {
+            if (playerCount >= 3 && player3 && player3.isAiming) {
                 const target = getNearestTarget(player3);
                 drawTargetingLine(player3, target);
+            }
+            if (playerCount === 4 && player4 && player4.isAiming) {
+                const target = getNearestTarget(player4);
+                drawTargetingLine(player4, target);
             }
             
             // Draw projectiles
