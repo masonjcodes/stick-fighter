@@ -99,6 +99,15 @@
         .color-option:hover {
             transform: scale(1.1);
         }
+
+        .ai-color-selection {
+            margin-top: 20px;
+        }
+
+        .ai-color-selection h3 {
+            color: white;
+            margin-bottom: 20px;
+        }
         
         .map-name {
             font-size: 24px;
@@ -251,6 +260,12 @@
             <button class="menu-button" onclick="addAI(true)">Add AI</button>
             <button class="menu-button" onclick="addAI(false)">No AI</button>
         </div>
+        <div class="ai-color-selection" id="aiColorSelection" style="display: none;">
+            <h3>Choose AI Character:</h3>
+            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;" id="aiColorOptions">
+                <!-- AI color options will be added dynamically -->
+            </div>
+        </div>
         <div class="color-selection" id="colorSelection" style="display: none;">
             <h3>Choose Your Color:</h3>
             <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
@@ -266,9 +281,17 @@
                     <div style="color: #228B22; font-size: 24px; margin-bottom: 10px;">Green</div>
                     <div style="color: white; font-size: 14px;">Earth Magic</div>
                 </div>
-                <div class="color-option" onclick="selectColor('brown')" style="background: rgba(101, 67, 33, 0.5);">
-                    <div style="color: #654321; font-size: 24px; margin-bottom: 10px;">Brown</div>
-                    <div style="color: white; font-size: 14px;">Dark Magic</div>
+                <div class="color-option" onclick="selectColor('dark')" style="background: rgba(0, 0, 0, 0.7);">
+                    <div style="color: #ffffff; font-size: 24px; margin-bottom: 10px;">Dark</div>
+                    <div style="color: #999; font-size: 14px;">Dark Magic</div>
+                </div>
+                <div class="color-option" onclick="selectColor('rainbow')" style="background: linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet);">
+                    <div style="color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); font-size: 24px; margin-bottom: 10px;">Builder</div>
+                    <div style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); font-size: 14px;">Wall/Block Magic</div>
+                </div>
+                <div class="color-option" onclick="selectColor('white')" style="background: radial-gradient(circle, rgba(255,255,255,0.9), rgba(255,255,200,0.6));">
+                    <div style="color: #333; font-size: 24px; margin-bottom: 10px;">Light</div>
+                    <div style="color: #555; font-size: 14px;">Light Magic</div>
                 </div>
             </div>
         </div>
@@ -324,37 +347,37 @@
         <canvas id="gameCanvas" width="1000" height="500"></canvas>
         <div class="controls">
             <div class="control-section">
-                <h3>Player 1 (Red)</h3>
+                <h3>Player 1</h3>
                 <div><span class="key">W</span> Jump</div>
                 <div><span class="key">A</span> <span class="key">D</span> Move</div>
                 <div><span class="key">S</span> Attack</div>
                 <div><span class="key">Q</span> Switch Weapon</div>
                 <div><span class="key">E</span> Hold to Aim Bow</div>
-                <div><span class="key">E+Q</span> Fire Blast</div>
+                <div><span class="key">E+Q</span> Ability</div>
             </div>
             <div class="control-section">
-                <h3>Player 2 (Blue)</h3>
+                <h3>Player 2</h3>
                 <div><span class="key">↑</span> Jump</div>
                 <div><span class="key">←</span> <span class="key">→</span> Move</div>
                 <div><span class="key">↓</span> Attack</div>
                 <div><span class="key">/</span> Switch Weapon</div>
                 <div><span class="key">.</span> Hold to Aim Bow</div>
-                <div><span class="key">.+/</span> Ice Blast</div>
+                <div><span class="key">.+/</span> Ability</div>
             </div>
             <div class="control-section" id="player3Controls" style="display: none;">
-                <h3>Player 3 (Green)</h3>
+                <h3>Player 3</h3>
                 <div><span class="key">I</span> Jump</div>
                 <div><span class="key">J</span> <span class="key">L</span> Move</div>
                 <div><span class="key">K</span> Attack</div>
                 <div><span class="key">U</span> Switch Weapon</div>
                 <div><span class="key">O</span> Hold to Aim Bow</div>
-                <div><span class="key">O+U</span> Earth Blast</div>
+                <div><span class="key">O+U</span> Ability</div>
             </div>
             <div class="control-section" id="player4Controls" style="display: none;">
-                <h3>Player 4 (Brown)</h3>
+                <h3>Player 4</h3>
                 <div>AI Controlled</div>
                 <div>Automatically fights</div>
-                <div>Casts Dark Magic</div>
+                <div>Uses Ability</div>
             </div>
         </div>
     </div>
@@ -381,12 +404,32 @@
         let humanPlayerCount = 2;
         let playerColors = [];
         let lastInputTime = 0;
+
+        // Round system
+        let currentRound = 1;
+        let maxRounds = 2;
+        let roundWins = {}; // Track wins per player
+        let ultimateChargedPlayer = null;
+        let roundTransition = false;
+        let roundTransitionTimer = 0;
+
+        // Ultimate states
+        let activeUltimate = null;
+        let ultimateTimer = 0;
+        const meteors = [];
+        const trapBoxes = [];
+        let floorLava = false;
+        let floorLavaTimer = 0;
         let colorMap = {
             'red': { color: '#dc143c', magic: 'fire' },
             'blue': { color: '#0000ff', magic: 'ice' },
             'green': { color: '#228B22', magic: 'earth' },
-            'brown': { color: '#654321', magic: 'dark' }
+            'dark': { color: '#000000', magic: 'dark' },
+            'rainbow': { color: '#ffffff', magic: 'builder' },
+            'white': { color: '#ffffff', magic: 'light' }
         };
+        const builderStructures = [];
+        const lightBeams = [];
         
         // Platform class for platform maps
         class Platform {
@@ -599,7 +642,7 @@
                 this.height = 30;
                 this.owner = owner;
                 this.damage = magicSettings.damage;
-                this.type = type; // 'fire', 'ice', 'earth', 'dark'
+                this.type = type; // 'fire', 'ice', 'earth', 'dark', 'light'
                 this.active = true;
                 this.rotation = 0;
                 this.particles = [];
@@ -611,7 +654,7 @@
             }
 
             update() {
-                // Heat-seeking for fire, ice, and dark (earth no longer uses projectiles)
+                // Heat-seeking for fire, ice, and dark (earth no longer uses projectiles, light uses beam)
                 if ((this.type === 'fire' || this.type === 'ice' || this.type === 'dark') && this.target && this.target.health > 0) {
                     const dx = (this.target.x + this.target.width/2) - this.x;
                     const dy = (this.target.y + this.target.height/2) - this.y;
@@ -688,6 +731,9 @@
                         case 'dark':
                             ctx.fillStyle = `rgba(75, 0, 130, ${alpha})`;
                             break;
+                        case 'light':
+                            ctx.fillStyle = `rgba(255, 255, 200, ${alpha})`;
+                            break;
                     }
                     ctx.beginPath();
                     ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -722,6 +768,11 @@
                         gradient.addColorStop(0.5, 'rgba(75, 0, 130, 0.6)');
                         gradient.addColorStop(1, 'rgba(25, 0, 50, 0.2)');
                         break;
+                    case 'light':
+                        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+                        gradient.addColorStop(0.5, 'rgba(255, 255, 200, 0.8)');
+                        gradient.addColorStop(1, 'rgba(255, 255, 150, 0.3)');
+                        break;
                 }
 
                 ctx.fillStyle = gradient;
@@ -742,6 +793,11 @@
                         break;
                     case 'dark':
                         ctx.fillStyle = 'rgba(50, 0, 100, 0.9)';
+                        break;
+                    case 'light':
+                        ctx.fillStyle = 'rgba(255, 255, 230, 1)';
+                        ctx.shadowColor = 'rgba(255, 255, 200, 0.8)';
+                        ctx.shadowBlur = 10;
                         break;
                 }
                 ctx.beginPath();
@@ -848,9 +904,35 @@
                 this.isAiming = false;
                 this.magicCooldown = 0;
                 this.magicElement = 'fire'; // default, will be set per player
+                this.isChannelingLight = false;
+                this.lightDamageTimer = 0;
+                this.currentLightBeam = null;
+                this.usedUltimate = false;
+                this.isUsingUltimate = false;
+                this.ultimateFlying = false;
+                this.flyVelocityX = 0;
+                this.flyVelocityY = 0;
+                this.frozen = false;
+                this.playerId = null; // Will be set when created
             }
 
             update() {
+                // Don't update if frozen (except for ultimate users)
+                if (this.frozen && !this.isUsingUltimate) {
+                    // Still apply gravity
+                    if (!this.onGround) {
+                        this.velocityY += 0.65;
+                    }
+                    this.y += this.velocityY;
+                    // Ground collision for frozen players
+                    if (this.y + this.height >= groundY) {
+                        this.y = groundY - this.height;
+                        this.velocityY = 0;
+                        this.onGround = true;
+                    }
+                    return;
+                }
+
                 // Don't update if dead
                 if (this.health <= 0) {
                     this.velocityX = 0;
@@ -909,18 +991,53 @@
                 }
 
                 // Update position
-                this.x += this.velocityX;
-                this.y += this.velocityY;
+                if (this.ultimateFlying) {
+                    // Flying movement for Light/Dark ultimate
+                    this.x += this.flyVelocityX;
+                    this.y += this.flyVelocityY;
+                    // No gravity when flying
+                } else {
+                    this.x += this.velocityX;
+                    this.y += this.velocityY;
+                }
 
-                // Platform and ground collision
-                let onPlatform = false;
-                let wasOnGround = this.onGround;
+                // Platform and ground collision (skip if flying)
+                if (!this.ultimateFlying) {
+                    let onPlatform = false;
+                    let wasOnGround = this.onGround;
                 
                 // Check platform collisions
                 for (let platform of platforms) {
                     if (platform.checkCollision(this)) {
                         onPlatform = true;
                         break;
+                    }
+                }
+
+                // Check builder block collision (only blocks, not walls)
+                for (let structure of builderStructures) {
+                    if (structure.type === 'block') {
+                        const playerLeft = this.x;
+                        const playerRight = this.x + this.width;
+                        const playerTop = this.y;
+                        const playerBottom = this.y + this.height;
+
+                        const blockLeft = structure.x - structure.width/2;
+                        const blockRight = structure.x + structure.width/2;
+                        const blockTop = structure.y - structure.height/2;
+                        const blockBottom = structure.y + structure.height/2;
+
+                        // Check if player is on top of block
+                        if (this.velocityY >= 0 &&
+                            playerBottom >= blockTop &&
+                            playerBottom <= blockTop + 10 &&
+                            playerRight > blockLeft &&
+                            playerLeft < blockRight) {
+                            this.y = blockTop - this.height;
+                            this.velocityY = 0;
+                            onPlatform = true;
+                            this.onGround = true;
+                        }
                     }
                 }
                 
@@ -948,13 +1065,19 @@
                         }
                     }
                 }
+                } else {
+                    // Flying players ignore ground
+                    this.onGround = false;
+                }
 
                 // Wall collision
                 if (this.x < 0) this.x = 0;
                 if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
 
-                // Friction
-                this.velocityX *= 0.85;
+                // Friction (not when flying)
+                if (!this.ultimateFlying) {
+                    this.velocityX *= 0.85;
+                }
 
                 // Update attack cooldown
                 if (this.attackCooldown > 0) {
@@ -1007,6 +1130,20 @@
                     drawColor = 'gray';
                 } else if (this.slowed) {
                     drawColor = '#87CEEB'; // Light blue tint when slowed
+                } else if (this.magicElement === 'builder') {
+                    // Rainbow effect for builder
+                    const rainbowColors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#9400d3'];
+                    const colorIndex = Math.floor((Date.now() / 200) % rainbowColors.length);
+                    drawColor = rainbowColors[colorIndex];
+                }
+
+                // Glowing effect for light character
+                if (this.magicElement === 'light') {
+                    // Draw glow
+                    ctx.shadowColor = 'rgba(255, 255, 200, 0.8)';
+                    ctx.shadowBlur = 20;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
                 }
 
                 // Draw burn effect
@@ -1105,6 +1242,12 @@
                 ctx.lineTo(this.x + this.width/2 + 15 + legOffset2, this.y + this.height);
                 ctx.stroke();
 
+                // Reset shadow for light character
+                if (this.magicElement === 'light') {
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                }
+
                 ctx.restore();
             }
 
@@ -1202,10 +1345,136 @@
                 this.bowCooldown = bowSettings.cooldown / 10;
             }
 
+            useUltimate() {
+                if (this.health <= 0) return;
+
+                // Toggle off if already using
+                if (this.isUsingUltimate && (this.magicElement === 'light' || this.magicElement === 'dark')) {
+                    this.stopUltimate();
+                    return;
+                }
+
+                if (this.usedUltimate) return;
+                this.usedUltimate = true;
+
+                this.isUsingUltimate = true;
+                activeUltimate = this.magicElement;
+
+                switch(this.magicElement) {
+                    case 'light':
+                    case 'dark':
+                        this.ultimateFlying = true;
+                        this.onGround = false;
+                        // No timer for Light/Dark - manual toggle
+                        break;
+                    case 'earth':
+                        // Start meteor rain
+                        ultimateTimer = 200;
+                        for (let i = 0; i < 15; i++) {
+                            setTimeout(() => {
+                                if (this.isUsingUltimate) {
+                                    meteors.push({
+                                        x: Math.random() * canvas.width,
+                                        y: -50,
+                                        velocityY: 5 + Math.random() * 3,
+                                        size: 30 + Math.random() * 20,
+                                        owner: this
+                                    });
+                                }
+                            }, i * 200);
+                        }
+                        break;
+                    case 'fire':
+                        floorLava = true;
+                        floorLavaTimer = 180;
+                        ultimateTimer = 180;
+                        break;
+                    case 'ice':
+                        // Freeze all enemies
+                        ultimateTimer = 180;
+                        const allPlayers = [player1, player2];
+                        if (player3) allPlayers.push(player3);
+                        if (player4) allPlayers.push(player4);
+                        allPlayers.forEach(p => {
+                            if (p !== this && p.health > 0) {
+                                p.frozen = true;
+                                setTimeout(() => {
+                                    p.frozen = false;
+                                }, 3000);
+                            }
+                        });
+                        break;
+                    case 'builder':
+                        // Create trap boxes around enemies
+                        ultimateTimer = 300;
+                        const players = [player1, player2];
+                        if (player3) players.push(player3);
+                        if (player4) players.push(player4);
+                        players.forEach(p => {
+                            if (p !== this && p.health > 0) {
+                                trapBoxes.push({
+                                    x: p.x - 40,
+                                    y: p.y - 40,
+                                    width: p.width + 80,
+                                    height: p.height + 80,
+                                    owner: this
+                                });
+                            }
+                        });
+                        break;
+                }
+            }
+
+            stopUltimate() {
+                this.isUsingUltimate = false;
+                this.ultimateFlying = false;
+                this.flyVelocityX = 0;
+                this.flyVelocityY = 0;
+                this.onGround = false; // Reset ground state
+                if (activeUltimate === this.magicElement) {
+                    activeUltimate = null;
+                    // Clear ultimate effects immediately
+                    if (this.magicElement === 'fire') {
+                        floorLava = false;
+                        floorLavaTimer = 0;
+                    }
+                    if (this.magicElement === 'earth') {
+                        meteors.length = 0;
+                    }
+                    if (this.magicElement === 'builder') {
+                        trapBoxes.length = 0;
+                    }
+                    if (this.magicElement === 'ice') {
+                        // Unfreeze all players
+                        const allPlayers = [player1, player2];
+                        if (player3) allPlayers.push(player3);
+                        if (player4) allPlayers.push(player4);
+                        allPlayers.forEach(p => p.frozen = false);
+                    }
+                    ultimateTimer = 0;
+                }
+            }
+
             castMagic(direction) {
+                if (this.health <= 0) return;
+                if (this.frozen) return;
+
+                // Builder magic - place walls/blocks with no cooldown
+                if (this.magicElement === 'builder') {
+                    const structure = {
+                        x: this.x + this.width/2 + (this.facing === 1 ? 40 : -40),
+                        y: this.onGround ? groundY - 30 : this.y + this.height + 20,
+                        width: 20,
+                        height: this.onGround ? 60 : 20,
+                        type: this.onGround ? 'wall' : 'block',
+                        color: '#8B4513'
+                    };
+                    builderStructures.push(structure);
+                    return; // No cooldown for builder
+                }
+
                 // Dark magic has no cooldown but always self-damages
                 if (this.magicElement !== 'dark' && this.magicCooldown > 0) return;
-                if (this.health <= 0) return;
 
                 // Dark magic always causes self-damage
                 if (this.magicElement === 'dark') {
@@ -1225,7 +1494,12 @@
                     return; // Don't create a projectile
                 }
 
-                // Find nearest target for heat-seeking/earth spike
+                // Light magic is handled as continuous in handleInput
+                if (this.magicElement === 'light') {
+                    return;
+                }
+
+                // Find nearest target for heat-seeking
                 let target = null;
                 if (this.magicElement === 'fire' || this.magicElement === 'ice' ||
                     this.magicElement === 'dark' || this.magicElement === 'earth') {
@@ -1391,6 +1665,17 @@
             if (playerCount >= 3 && player3 && !player3.isAI && keys[player3.controls.bow] && e.key.toLowerCase() === player3.controls.switchWeapon) {
                 player3.castMagic();
             }
+
+            // Ultimate activation - F for player 1, Control for player 2, H for player 3
+            if (!player1.isAI && currentRound > 1 && !player1.usedUltimate && e.key.toLowerCase() === 'f') {
+                player1.useUltimate();
+            }
+            if (!player2.isAI && currentRound > 1 && !player2.usedUltimate && e.key.toLowerCase() === 'control') {
+                player2.useUltimate();
+            }
+            if (playerCount >= 3 && player3 && !player3.isAI && currentRound > 1 && !player3.usedUltimate && e.key.toLowerCase() === 'h') {
+                player3.useUltimate();
+            }
         });
 
         document.addEventListener('keyup', (e) => {
@@ -1494,13 +1779,110 @@
             });
         }
 
+        function updateLightBeams() {
+            const allPlayers = [player1, player2];
+            if (player3) allPlayers.push(player3);
+            if (player4) allPlayers.push(player4);
+
+            allPlayers.forEach(player => {
+                if (!player || player.isAI || player.health <= 0 || player.magicElement !== 'light') return;
+
+                const shouldChannel = keys[player.controls.bow] && keys[player.controls.switchWeapon];
+
+                if (shouldChannel) {
+                    if (!player.isChannelingLight) {
+                        player.isChannelingLight = true;
+                        player.lightDamageTimer = 0;
+                    }
+
+                    // Find target
+                    let target = null;
+                    let minDistance = Infinity;
+                    allPlayers.forEach(p => {
+                        if (p !== player && p.health > 0) {
+                            const dist = Math.abs(p.x - player.x) + Math.abs(p.y - player.y);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                target = p;
+                            }
+                        }
+                    });
+
+                    if (target) {
+                        // Update or create beam
+                        let beam = lightBeams.find(b => b.owner === player);
+                        if (!beam) {
+                            beam = {
+                                owner: player,
+                                startX: player.x + player.width/2,
+                                startY: player.y + player.height/2,
+                                endX: target.x + target.width/2,
+                                endY: target.y + target.height/2,
+                                timeHeld: 0
+                            };
+                            lightBeams.push(beam);
+                        } else {
+                            beam.startX = player.x + player.width/2;
+                            beam.startY = player.y + player.height/2;
+                            beam.endX = target.x + target.width/2;
+                            beam.endY = target.y + target.height/2;
+                            beam.timeHeld++;
+                        }
+
+                        // Deal damage periodically
+                        player.lightDamageTimer++;
+                        if (player.lightDamageTimer >= 10) { // Every 10 frames
+                            player.lightDamageTimer = 0;
+
+                            let damage = 5;
+                            if (target.magicElement !== 'dark') {
+                                // Reduce damage over time
+                                damage = Math.max(1, 5 - Math.floor(beam.timeHeld / 60));
+                            } else {
+                                // Instant kill for dark
+                                damage = target.health;
+                            }
+
+                            target.takeDamage(damage);
+                            createHitEffect(target.x + target.width/2, target.y + target.height/2);
+                        }
+                    } else {
+                        // No target, remove beam
+                        const beamIndex = lightBeams.findIndex(b => b.owner === player);
+                        if (beamIndex !== -1) {
+                            lightBeams.splice(beamIndex, 1);
+                        }
+                    }
+                } else {
+                    // Not channeling, clean up
+                    if (player.isChannelingLight) {
+                        player.isChannelingLight = false;
+                        const beamIndex = lightBeams.findIndex(b => b.owner === player);
+                        if (beamIndex !== -1) {
+                            lightBeams.splice(beamIndex, 1);
+                        }
+                    }
+                }
+            });
+        }
+
         function handleInput() {
             // Player 1 controls (only if not AI)
             if (!player1.isAI) {
-                if (keys[player1.controls.jump]) player1.jump();
-                if (keys[player1.controls.left]) player1.moveLeft();
-                if (keys[player1.controls.right]) player1.moveRight();
-                if (keys[player1.controls.attack]) player1.attack();
+                // Flying controls for ultimate
+                if (player1.ultimateFlying) {
+                    player1.flyVelocityX = 0;
+                    player1.flyVelocityY = 0;
+                    if (keys[player1.controls.jump]) player1.flyVelocityY = -8;
+                    if (keys[player1.controls.attack]) player1.flyVelocityY = 8;
+                    if (keys[player1.controls.left]) player1.flyVelocityX = -8;
+                    if (keys[player1.controls.right]) player1.flyVelocityX = 8;
+                } else if (!player1.frozen) {
+                    if (keys[player1.controls.jump]) player1.jump();
+                    if (keys[player1.controls.left]) player1.moveLeft();
+                    if (keys[player1.controls.right]) player1.moveRight();
+                    if (keys[player1.controls.attack]) player1.attack();
+                }
             
                 // Handle bow for player 1
                 if (keys[player1.controls.bow]) {
@@ -1516,10 +1898,20 @@
 
             // Player 2 controls (only if not AI)
             if (!player2.isAI) {
-                if (keys[player2.controls.jump.toLowerCase()]) player2.jump();
-                if (keys[player2.controls.left.toLowerCase()]) player2.moveLeft();
-                if (keys[player2.controls.right.toLowerCase()]) player2.moveRight();
-                if (keys[player2.controls.attack.toLowerCase()]) player2.attack();
+                // Flying controls for ultimate
+                if (player2.ultimateFlying) {
+                    player2.flyVelocityX = 0;
+                    player2.flyVelocityY = 0;
+                    if (keys[player2.controls.jump.toLowerCase()]) player2.flyVelocityY = -8;
+                    if (keys[player2.controls.attack.toLowerCase()]) player2.flyVelocityY = 8;
+                    if (keys[player2.controls.left.toLowerCase()]) player2.flyVelocityX = -8;
+                    if (keys[player2.controls.right.toLowerCase()]) player2.flyVelocityX = 8;
+                } else if (!player2.frozen) {
+                    if (keys[player2.controls.jump.toLowerCase()]) player2.jump();
+                    if (keys[player2.controls.left.toLowerCase()]) player2.moveLeft();
+                    if (keys[player2.controls.right.toLowerCase()]) player2.moveRight();
+                    if (keys[player2.controls.attack.toLowerCase()]) player2.attack();
+                }
             
                 // Handle bow for player 2
                 if (keys[player2.controls.bow]) {
@@ -1610,7 +2002,20 @@
 
                             // For earth spikes, don't remove immediately - let animation finish
                             if (blast.type !== 'earth') {
-                                player.takeDamage(blast.damage);
+                                // Light character is immune to dark magic
+                                if (blast.type === 'dark' && player.magicElement === 'light') {
+                                    // No damage, just remove the blast
+                                    magicBlasts.splice(i, 1);
+                                    break;
+                                }
+
+                                // Light magic one-hits dark characters
+                                let damage = blast.damage;
+                                if (blast.type === 'light' && player.magicElement === 'dark') {
+                                    damage = player.health; // One-hit kill
+                                }
+
+                                player.takeDamage(damage);
 
                                 // Apply magic effects
                                 if (blast.type === 'ice') {
@@ -1708,17 +2113,134 @@
 
         function checkGameOver() {
             const alivePlayers = [];
-            if (player1.health > 0) alivePlayers.push('Player 1');
-            if (player2.health > 0) alivePlayers.push('Player 2');
-            if (playerCount >= 3 && player3 && player3.health > 0) alivePlayers.push('Player 3');
-            if (playerCount === 4 && player4 && player4.health > 0) alivePlayers.push('Player 4 (AI)');
+            let alivePlayer = null;
+            if (player1.health > 0) { alivePlayers.push('Player 1'); alivePlayer = player1; }
+            if (player2.health > 0) { alivePlayers.push('Player 2'); alivePlayer = player2; }
+            if (playerCount >= 3 && player3 && player3.health > 0) { alivePlayers.push('Player 3'); alivePlayer = player3; }
+            if (playerCount === 4 && player4 && player4.health > 0) { alivePlayers.push('Player 4'); alivePlayer = player4; }
 
-            if (alivePlayers.length <= 1) {
-                gameRunning = false;
-                const winner = alivePlayers.length === 1 ? alivePlayers[0] : 'No one';
-                document.getElementById('winnerText').textContent = `${winner} Wins!`;
-                document.getElementById('gameOver').style.display = 'block';
+            if (alivePlayers.length <= 1 && !roundTransition) {
+                roundTransition = true;
+                roundTransitionTimer = 120; // 2 second pause
+
+                const roundWinner = alivePlayers.length === 1 ? alivePlayers[0] : 'No one';
+
+                // Track round wins
+                if (alivePlayer) {
+                    if (!roundWins[roundWinner]) roundWins[roundWinner] = 0;
+                    roundWins[roundWinner]++;
+                }
+
+                // Check if game is over
+                if (currentRound >= maxRounds) {
+                    // Find overall winner
+                    let overallWinner = null;
+                    let maxWins = 0;
+                    for (let [player, wins] of Object.entries(roundWins)) {
+                        if (wins > maxWins) {
+                            maxWins = wins;
+                            overallWinner = player;
+                        }
+                    }
+
+                    gameRunning = false;
+                    document.getElementById('winnerText').textContent = `${overallWinner || 'No one'} Wins the Match!`;
+                    document.getElementById('gameOver').style.display = 'block';
+                } else {
+                    // Start next round after delay
+                    setTimeout(() => {
+                        currentRound++;
+                        // Extra safety: clear everything before new round
+                        activeUltimate = null;
+                        floorLava = false;
+                        meteors.length = 0;
+                        trapBoxes.length = 0;
+                        lightBeams.length = 0;
+
+                        // Unfreeze everyone
+                        if (player1) player1.frozen = false;
+                        if (player2) player2.frozen = false;
+                        if (player3) player3.frozen = false;
+                        if (player4) player4.frozen = false;
+
+                        startNewRound();
+                    }, 2000);
+                }
             }
+        }
+
+        function startNewRound() {
+            // FORCE CLEAR ALL ULTIMATE EFFECTS IMMEDIATELY
+            activeUltimate = null;
+            ultimateTimer = 0;
+            meteors.length = 0;
+            trapBoxes.length = 0;
+            floorLava = false;
+            floorLavaTimer = 0;
+            lightBeams.length = 0;
+            builderStructures.length = 0;
+            projectiles.length = 0;
+            magicBlasts.length = 0;
+            hitEffects.length = 0;
+
+            // Reset ALL player states
+            function resetPlayer(player, xPos) {
+                if (!player) return;
+
+                // Position and physics
+                player.x = xPos;
+                player.y = groundY - 100;
+                player.velocityX = 0;
+                player.velocityY = 0;
+                player.flyVelocityX = 0;
+                player.flyVelocityY = 0;
+
+                // Health
+                player.health = player.maxHealth;
+
+                // Status effects
+                player.frozen = false;
+                player.stunned = false;
+                player.stunTimer = 0;
+                player.slowed = false;
+                player.slowTimer = 0;
+                player.burning = false;
+                player.burnTimer = 0;
+                player.burnDamageTimer = 0;
+
+                // Ultimate states
+                player.isUsingUltimate = false;
+                player.ultimateFlying = false;
+                player.onGround = false;
+
+                // Combat states
+                player.attacking = false;
+                player.attackCooldown = 0;
+                player.attackAngle = 0;
+                player.hitConfirmed = false;
+                player.isAiming = false;
+                player.bowCooldown = 0;
+                player.magicCooldown = 0;
+
+                // Light beam states
+                player.isChannelingLight = false;
+                player.lightDamageTimer = 0;
+                player.currentLightBeam = null;
+            }
+
+            resetPlayer(player1, 200);
+            resetPlayer(player2, 800);
+            resetPlayer(player3, 500);
+            resetPlayer(player4, 700);
+
+            // Clear any remaining effects
+            earthquakeActive = false;
+            earthquakeTimer = 0;
+            earthquakeCaster = null;
+            screenShake = 0;
+
+            roundTransition = false;
+            roundTransitionTimer = 0;
         }
 
         function selectPlayerCount(count) {
@@ -1749,6 +2271,15 @@
             document.getElementById('colorSelection').style.display = 'block';
         }
 
+        let aiSelectedColor = null;
+
+        function selectAIColor(color) {
+            aiSelectedColor = color;
+            document.getElementById('aiColorSelection').style.display = 'none';
+            document.getElementById('mapSelection').style.display = 'block';
+            setupPlayers();
+        }
+
         function selectColor(color) {
             playerColors.push(color);
 
@@ -1767,8 +2298,45 @@
             } else {
                 // All players have selected colors
                 document.getElementById('colorSelection').style.display = 'none';
-                document.getElementById('mapSelection').style.display = 'block';
-                setupPlayers();
+
+                // If AI is enabled, show AI color selection
+                if (hasAI) {
+                    document.getElementById('aiColorSelection').style.display = 'block';
+
+                    // Build AI color options
+                    const aiColorOptions = document.getElementById('aiColorOptions');
+                    aiColorOptions.innerHTML = '';
+                    const availableColors = ['red', 'blue', 'green', 'dark', 'rainbow', 'white'].filter(c => !playerColors.includes(c));
+
+                    availableColors.forEach(color => {
+                        const colorData = colorMap[color];
+                        const option = document.createElement('div');
+                        option.className = 'color-option';
+                        option.onclick = () => selectAIColor(color);
+
+                        // Set background based on color
+                        if (color === 'rainbow') {
+                            option.style.background = 'linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet)';
+                        } else if (color === 'white') {
+                            option.style.background = 'radial-gradient(circle, rgba(255,255,255,0.9), rgba(255,255,200,0.6))';
+                        } else {
+                            option.style.background = `rgba(${parseInt(colorData.color.slice(1,3),16)}, ${parseInt(colorData.color.slice(3,5),16)}, ${parseInt(colorData.color.slice(5,7),16)}, 0.5)`;
+                        }
+
+                        const colorName = color.charAt(0).toUpperCase() + color.slice(1);
+                        const magicName = colorData.magic.charAt(0).toUpperCase() + colorData.magic.slice(1);
+
+                        option.innerHTML = `
+                            <div style="color: ${color === 'white' ? '#333' : (color === 'rainbow' ? 'white' : colorData.color)}; font-size: 24px; margin-bottom: 10px; ${color === 'rainbow' ? 'text-shadow: 2px 2px 4px rgba(0,0,0,0.5);' : ''}">${colorName === 'Rainbow' ? 'Builder' : colorName}</div>
+                            <div style="color: ${color === 'white' ? '#555' : 'white'}; font-size: 14px; ${color === 'rainbow' ? 'text-shadow: 1px 1px 2px rgba(0,0,0,0.5);' : ''}">${magicName} Magic</div>
+                        `;
+
+                        aiColorOptions.appendChild(option);
+                    });
+                } else {
+                    document.getElementById('mapSelection').style.display = 'block';
+                    setupPlayers();
+                }
             }
         }
 
@@ -1794,9 +2362,11 @@
                     switchWeapon: '',
                     bow: ''
                 };
-                // AI gets a random color from remaining options
-                const aiColors = ['red', 'blue', 'green', 'brown'].filter(c => !playerColors.includes(c));
-                const aiColor = aiColors[Math.floor(Math.random() * aiColors.length)];
+                // Use selected AI color or random if not selected
+                const aiColor = aiSelectedColor || (() => {
+                    const aiColors = ['red', 'blue', 'green', 'dark', 'rainbow', 'white'].filter(c => !playerColors.includes(c));
+                    return aiColors[Math.floor(Math.random() * aiColors.length)];
+                })();
                 player2.color = colorMap[aiColor].color;
                 player2.magicElement = colorMap[aiColor].magic;
             } else if (humanPlayerCount === 2) {
@@ -1816,7 +2386,7 @@
 
                 if (hasAI) {
                     // Add AI as player 3
-                    const aiColors = ['red', 'blue', 'green', 'brown'].filter(c => !playerColors.includes(c));
+                    const aiColors = ['red', 'blue', 'green', 'dark', 'rainbow', 'white'].filter(c => !playerColors.includes(c));
                     const aiColor = aiColors[Math.floor(Math.random() * aiColors.length)];
                     player3 = new Player(500, colorMap[aiColor].color, {
                         jump: '',
@@ -1849,8 +2419,10 @@
 
                 if (hasAI) {
                     // Add AI as player 4
-                    const aiColors = ['red', 'blue', 'green', 'brown'].filter(c => !playerColors.includes(c));
-                    const aiColor = aiColors[Math.floor(Math.random() * aiColors.length)];
+                    const aiColor = aiSelectedColor || (() => {
+                        const aiColors = ['red', 'blue', 'green', 'dark', 'rainbow', 'white'].filter(c => !playerColors.includes(c));
+                        return aiColors[Math.floor(Math.random() * aiColors.length)];
+                    })();
                     player4 = new Player(700, colorMap[aiColor].color, {
                         jump: '',
                         left: '',
@@ -1874,6 +2446,12 @@
         }
         
         function startGame() {
+            // Set max rounds based on player count
+            maxRounds = playerCount;
+            currentRound = 1;
+            roundWins = {};
+            ultimateChargedPlayer = null;
+
             // Hide menu, show game
             document.getElementById('mainMenu').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'block';
@@ -1882,7 +2460,12 @@
             // Update player 1 display
             const getColorName = (color) => {
                 for (let [name, data] of Object.entries(colorMap)) {
-                    if (data.color === color) return name.charAt(0).toUpperCase() + name.slice(1);
+                    if (data.color === color) {
+                        // Special case for rainbow (Builder) and white (Light)
+                        if (name === 'rainbow') return 'Builder';
+                        if (name === 'white') return 'Light';
+                        return name.charAt(0).toUpperCase() + name.slice(1);
+                    }
                 }
                 return 'Player';
             };
@@ -1893,7 +2476,9 @@
                         if (name === 'red') return 'rgba(220, 20, 60, 0.3)';
                         if (name === 'blue') return 'rgba(0, 0, 255, 0.3)';
                         if (name === 'green') return 'rgba(0, 255, 0, 0.3)';
-                        if (name === 'brown') return 'rgba(101, 67, 33, 0.5)';
+                        if (name === 'dark') return 'rgba(0, 0, 0, 0.5)';
+                        if (name === 'rainbow') return 'linear-gradient(45deg, rgba(255,0,0,0.3), rgba(255,255,0,0.3), rgba(0,255,0,0.3), rgba(0,0,255,0.3))';
+                        if (name === 'white') return 'rgba(255, 255, 200, 0.3)';
                     }
                 }
                 return 'rgba(128, 128, 128, 0.3)';
@@ -1977,6 +2562,37 @@
             player1.hitConfirmed = false;
             player2.hitConfirmed = false;
 
+            // Reset ALL effects for player 1 and 2
+            player1.frozen = false;
+            player1.isUsingUltimate = false;
+            player1.ultimateFlying = false;
+            player1.flyVelocityX = 0;
+            player1.flyVelocityY = 0;
+            player1.slowed = false;
+            player1.slowTimer = 0;
+            player1.burning = false;
+            player1.burnTimer = 0;
+            player1.burnDamageTimer = 0;
+            player1.isChannelingLight = false;
+            player1.lightDamageTimer = 0;
+            player1.usedUltimate = false;
+            player1.onGround = false;
+
+            player2.frozen = false;
+            player2.isUsingUltimate = false;
+            player2.ultimateFlying = false;
+            player2.flyVelocityX = 0;
+            player2.flyVelocityY = 0;
+            player2.slowed = false;
+            player2.slowTimer = 0;
+            player2.burning = false;
+            player2.burnTimer = 0;
+            player2.burnDamageTimer = 0;
+            player2.isChannelingLight = false;
+            player2.lightDamageTimer = 0;
+            player2.usedUltimate = false;
+            player2.onGround = false;
+
             // Reset player 3 if active
             if (playerCount >= 3 && player3) {
                 player3.health = player3.maxHealth;
@@ -2007,7 +2623,13 @@
             projectiles.length = 0;
             magicBlasts.length = 0;
             hitEffects.length = 0;
-            
+
+            // Assign player IDs
+            player1.playerId = 'Player 1';
+            player2.playerId = 'Player 2';
+            if (player3) player3.playerId = 'Player 3';
+            if (player4) player4.playerId = 'Player 4';
+
             gameRunning = true;
             updateHealthBars();
             
@@ -2020,6 +2642,10 @@
         
         function backToMenu() {
             gameRunning = false;
+            // Clear builder structures and light beams
+            builderStructures.length = 0;
+            lightBeams.length = 0;
+
             document.getElementById('gameContainer').style.display = 'none';
             document.getElementById('mainMenu').style.display = 'block';
             document.getElementById('gameOver').style.display = 'none';
@@ -2028,8 +2654,10 @@
             document.getElementById('mapSelection').style.display = 'none';
             document.getElementById('aiSelection').style.display = 'none';
             document.getElementById('colorSelection').style.display = 'none';
+            document.getElementById('aiColorSelection').style.display = 'none';
             // Reset color selections
             playerColors = [];
+            aiSelectedColor = null;
             document.querySelectorAll('.color-option').forEach(option => {
                 option.style.opacity = '1';
                 option.style.pointerEvents = 'auto';
@@ -2038,6 +2666,10 @@
         }
         
         function restartGame() {
+            // Clear builder structures and light beams
+            builderStructures.length = 0;
+            lightBeams.length = 0;
+
             player1.health = player1.maxHealth;
             player2.health = player2.maxHealth;
             player1.x = playerCount === 3 ? 150 : 200;
@@ -2056,6 +2688,37 @@
             player2.attackAngle = 0;
             player1.hitConfirmed = false;
             player2.hitConfirmed = false;
+
+            // Reset ALL effects for player 1 and 2
+            player1.frozen = false;
+            player1.isUsingUltimate = false;
+            player1.ultimateFlying = false;
+            player1.flyVelocityX = 0;
+            player1.flyVelocityY = 0;
+            player1.slowed = false;
+            player1.slowTimer = 0;
+            player1.burning = false;
+            player1.burnTimer = 0;
+            player1.burnDamageTimer = 0;
+            player1.isChannelingLight = false;
+            player1.lightDamageTimer = 0;
+            player1.usedUltimate = false;
+            player1.onGround = false;
+
+            player2.frozen = false;
+            player2.isUsingUltimate = false;
+            player2.ultimateFlying = false;
+            player2.flyVelocityX = 0;
+            player2.flyVelocityY = 0;
+            player2.slowed = false;
+            player2.slowTimer = 0;
+            player2.burning = false;
+            player2.burnTimer = 0;
+            player2.burnDamageTimer = 0;
+            player2.isChannelingLight = false;
+            player2.lightDamageTimer = 0;
+            player2.usedUltimate = false;
+            player2.onGround = false;
 
             // Reset player 3 if active
             if (playerCount >= 3 && player3) {
@@ -2120,6 +2783,16 @@
             
             // Draw platforms
             platforms.forEach(platform => platform.draw());
+
+            // Draw builder structures
+            builderStructures.forEach(structure => {
+                ctx.fillStyle = structure.color;
+                ctx.fillRect(structure.x - structure.width/2, structure.y - structure.height/2, structure.width, structure.height);
+                // Add border
+                ctx.strokeStyle = '#654321';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(structure.x - structure.width/2, structure.y - structure.height/2, structure.width, structure.height);
+            });
         }
 
         function gameLoop() {
@@ -2171,17 +2844,63 @@
             // Handle input
             handleInput();
 
+            // Update continuous light beams
+            updateLightBeams();
+
             // Update AI only if there's been recent human input (within last 500ms)
             // This prevents AI from running when no humans are playing
             if (Date.now() - lastInputTime < 500) {
                 updateAI();
             }
 
+            // Check wall collisions for all players
+            const allPlayersWalls = [player1, player2];
+            if (playerCount >= 3 && player3) allPlayersWalls.push(player3);
+            if (playerCount === 4 && player4) allPlayersWalls.push(player4);
+
+            allPlayersWalls.forEach(player => {
+                // Check wall collisions for horizontal movement
+                for (let structure of builderStructures) {
+                    if (structure.type === 'wall') {
+                        const playerLeft = player.x;
+                        const playerRight = player.x + player.width;
+                        const playerTop = player.y;
+                        const playerBottom = player.y + player.height;
+
+                        const wallLeft = structure.x - structure.width/2;
+                        const wallRight = structure.x + structure.width/2;
+                        const wallTop = structure.y - structure.height/2;
+                        const wallBottom = structure.y + structure.height/2;
+
+                        // Check collision
+                        if (playerBottom > wallTop &&
+                            playerTop < wallBottom &&
+                            playerRight > wallLeft &&
+                            playerLeft < wallRight) {
+                            // Push player out of wall
+                            if (player.x + player.width/2 < structure.x) {
+                                player.x = wallLeft - player.width;
+                            } else {
+                                player.x = wallRight;
+                            }
+                            player.velocityX = 0;
+                        }
+                    }
+                }
+            });
+
             // Update players
             player1.update();
             player2.update();
             if (playerCount >= 3 && player3) {
                 player3.update();
+
+                if (player3.magicElement === 'light' && player3.isChannelingLight &&
+                    keys[player3.controls.bow] && keys[player3.controls.switchWeapon]) {
+                    player3.updateLightBeam();
+                } else if (player3.magicElement === 'light') {
+                    player3.stopLightBeam();
+                }
             }
             if (playerCount === 4 && player4) {
                 player4.update();
@@ -2210,6 +2929,123 @@
                     hitEffects.splice(i, 1);
                 }
             }
+
+            // Light beams are now managed in updateLightBeams()
+
+            // Update ultimates
+            if (ultimateTimer > 0) {
+                ultimateTimer--;
+                if (ultimateTimer <= 0) {
+                    // End non-toggle ultimates
+                    if (activeUltimate && activeUltimate !== 'light' && activeUltimate !== 'dark') {
+                        const allPlayers = [player1, player2];
+                        if (player3) allPlayers.push(player3);
+                        if (player4) allPlayers.push(player4);
+                        allPlayers.forEach(p => {
+                            if (p.magicElement === activeUltimate) {
+                                p.isUsingUltimate = false;
+                            }
+                        });
+                        activeUltimate = null;
+                        floorLava = false;
+                        trapBoxes.length = 0;
+                    }
+                }
+            }
+
+            // Update meteors
+            for (let i = meteors.length - 1; i >= 0; i--) {
+                const meteor = meteors[i];
+                meteor.y += meteor.velocityY;
+
+                // Check collision with players
+                const allPlayers = [player1, player2];
+                if (player3) allPlayers.push(player3);
+                if (player4) allPlayers.push(player4);
+
+                allPlayers.forEach(player => {
+                    if (player !== meteor.owner && player.health > 0) {
+                        const dx = player.x + player.width/2 - meteor.x;
+                        const dy = player.y + player.height/2 - meteor.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < meteor.size) {
+                            player.takeDamage(20);
+                            createHitEffect(player.x + player.width/2, player.y + player.height/2);
+                            meteors.splice(i, 1);
+                            return;
+                        }
+                    }
+                });
+
+                // Remove if off screen
+                if (meteor.y > canvas.height) {
+                    meteors.splice(i, 1);
+                }
+            }
+
+            // Floor lava damage
+            if (floorLava && floorLavaTimer > 0) {
+                floorLavaTimer--;
+                const allPlayers = [player1, player2];
+                if (player3) allPlayers.push(player3);
+                if (player4) allPlayers.push(player4);
+
+                allPlayers.forEach(player => {
+                    if (player.health > 0 && player.onGround && player.y >= groundY - player.height - 5) {
+                        if (!player.isUsingUltimate || player.magicElement !== 'fire') {
+                            player.takeDamage(2); // Constant damage
+                        }
+                    }
+                });
+
+                if (floorLavaTimer <= 0) {
+                    floorLava = false;
+                }
+            }
+
+            // Check Light/Dark ultimate collision
+            const allPlayersUlt = [player1, player2];
+            if (player3) allPlayersUlt.push(player3);
+            if (player4) allPlayersUlt.push(player4);
+
+            allPlayersUlt.forEach(flyingPlayer => {
+                if (flyingPlayer.ultimateFlying && flyingPlayer.health > 0) {
+                    allPlayersUlt.forEach(targetPlayer => {
+                        if (targetPlayer !== flyingPlayer && targetPlayer.health > 0) {
+                            // Check overlap
+                            if (flyingPlayer.x < targetPlayer.x + targetPlayer.width &&
+                                flyingPlayer.x + flyingPlayer.width > targetPlayer.x &&
+                                flyingPlayer.y < targetPlayer.y + targetPlayer.height &&
+                                flyingPlayer.y + flyingPlayer.height > targetPlayer.y) {
+
+                                // Dark can kill Light, Light cannot kill Dark
+                                if (flyingPlayer.magicElement === 'dark' || targetPlayer.magicElement !== 'dark') {
+                                    targetPlayer.health = 0;
+                                    createHitEffect(targetPlayer.x + targetPlayer.width/2, targetPlayer.y + targetPlayer.height/2);
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Trap box collision
+            trapBoxes.forEach(box => {
+                const allPlayers = [player1, player2];
+                if (player3) allPlayers.push(player3);
+                if (player4) allPlayers.push(player4);
+
+                allPlayers.forEach(player => {
+                    if (player !== box.owner && player.health > 0) {
+                        // Keep player inside box
+                        if (player.x < box.x) player.x = box.x;
+                        if (player.x + player.width > box.x + box.width) player.x = box.x + box.width - player.width;
+                        if (player.y < box.y) player.y = box.y;
+                        if (player.y + player.height > box.y + box.height) player.y = box.y + box.height - player.height;
+                    }
+                });
+            });
 
             // Update earthquake
             if (earthquakeActive) {
@@ -2278,7 +3114,88 @@
 
             // Draw magic blasts
             magicBlasts.forEach(blast => blast.draw());
-            
+
+            // Draw light beams on top
+            lightBeams.forEach(beam => {
+                const alpha = 1; // Always full opacity for continuous beams
+
+                // Create gradient for beam
+                const gradient = ctx.createLinearGradient(beam.startX, beam.startY, beam.endX, beam.endY);
+                gradient.addColorStop(0, `rgba(255, 255, 200, ${alpha})`);
+                gradient.addColorStop(0.5, `rgba(255, 255, 255, ${alpha})`);
+                gradient.addColorStop(1, `rgba(255, 255, 200, ${alpha * 0.5})`);
+
+                // Draw beam with glow
+                ctx.save();
+                ctx.shadowColor = 'rgba(255, 255, 200, 0.8)';
+                ctx.shadowBlur = 20;
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 8 + (Math.sin(Date.now() * 0.01) * 2);
+                ctx.beginPath();
+                ctx.moveTo(beam.startX, beam.startY);
+                ctx.lineTo(beam.endX, beam.endY);
+                ctx.stroke();
+
+                // Draw inner bright core
+                ctx.shadowBlur = 10;
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(beam.startX, beam.startY);
+                ctx.lineTo(beam.endX, beam.endY);
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            // Draw meteors
+            meteors.forEach(meteor => {
+                ctx.save();
+                // Draw meteor
+                const gradient = ctx.createRadialGradient(meteor.x, meteor.y, 0, meteor.x, meteor.y, meteor.size);
+                gradient.addColorStop(0, 'rgba(255, 100, 0, 1)');
+                gradient.addColorStop(0.5, 'rgba(255, 50, 0, 0.8)');
+                gradient.addColorStop(1, 'rgba(100, 0, 0, 0.5)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(meteor.x, meteor.y, meteor.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // Draw floor lava
+            if (floorLava) {
+                ctx.save();
+                const gradient = ctx.createLinearGradient(0, groundY - 10, 0, canvas.height);
+                gradient.addColorStop(0, 'rgba(255, 100, 0, 0.8)');
+                gradient.addColorStop(0.5, 'rgba(255, 0, 0, 0.6)');
+                gradient.addColorStop(1, 'rgba(100, 0, 0, 0.4)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, groundY - 10, canvas.width, canvas.height - groundY + 10);
+                ctx.restore();
+            }
+
+            // Draw trap boxes
+            trapBoxes.forEach(box => {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(139, 69, 19, 0.8)';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(box.x, box.y, box.width, box.height);
+                // Draw bars
+                for (let i = box.x + 10; i < box.x + box.width; i += 15) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, box.y);
+                    ctx.lineTo(i, box.y + box.height);
+                    ctx.stroke();
+                }
+                for (let i = box.y + 10; i < box.y + box.height; i += 15) {
+                    ctx.beginPath();
+                    ctx.moveTo(box.x, i);
+                    ctx.lineTo(box.x + box.width, i);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            });
+
             // Draw hit effects
             hitEffects.forEach(effect => effect.draw());
 
