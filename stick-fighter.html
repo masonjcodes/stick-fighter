@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medieval Stick Fighter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            display: none;
+        }
+        
+        .main-menu {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            text-align: center;
+            color: white;
+            min-width: 400px;
+        }
+        
+        .main-menu h1 {
+            font-size: 48px;
+            margin-bottom: 30px;
+            color: #FFD700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .menu-button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.2s;
+            min-width: 200px;
+        }
+        
+        .menu-button:hover {
+            transform: scale(1.05);
+        }
+        
+        .map-selection {
+            margin-top: 20px;
+        }
+        
+        .map-option {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            margin: 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .map-option:hover {
+            background: rgba(0, 0, 0, 0.5);
+        }
+        
+        .map-option.selected {
+            background: rgba(100, 126, 234, 0.5);
+            border: 2px solid #667eea;
+        }
+        
+        .map-name {
+            font-size: 24px;
+            color: #FFD700;
+            margin-bottom: 5px;
+        }
+        
+        .map-description {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        canvas {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            display: block;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .player-info {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 10px;
+            min-width: 200px;
+        }
+
+        .player1 {
+            background: rgba(255, 0, 0, 0.3);
+        }
+
+        .player2 {
+            background: rgba(0, 0, 255, 0.3);
+        }
+
+        .health-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #ffff00);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-around;
+            color: white;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .control-section {
+            text-align: center;
+        }
+
+        .control-section h3 {
+            margin-bottom: 10px;
+            color: #FFD700;
+        }
+
+        .key {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            margin: 2px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            z-index: 10;
+        }
+
+        .game-over h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #FFD700;
+        }
+
+        .restart-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .restart-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .weapon-indicator {
+            font-size: 14px;
+            color: #FFD700;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-menu" id="mainMenu">
+        <h1>Medieval Stick Fighter</h1>
+        <div class="map-selection">
+            <h3>Select Map:</h3>
+            <div class="map-option selected" onclick="selectMap('classic')" id="map-classic">
+                <div class="map-name">Classic Arena</div>
+                <div class="map-description">Simple flat ground for pure combat</div>
+            </div>
+            <div class="map-option" onclick="selectMap('platform')" id="map-platform">
+                <div class="map-name">Platform Battle</div>
+                <div class="map-description">Fight with a platform in the middle for strategic advantage</div>
+            </div>
+            <div class="map-option" onclick="selectMap('skylands')" id="map-skylands">
+                <div class="map-name">Sky Islands</div>
+                <div class="map-description">Battle across floating cloud platforms high in the sky</div>
+            </div>
+        </div>
+        <button class="menu-button" onclick="startGame()">Start Game</button>
+    </div>
+    
+    <div class="game-container" id="gameContainer">
+        <div class="game-info">
+            <div class="player-info player1">
+                <div>Player 1</div>
+                <div class="health-bar">
+                    <div class="health-fill" id="health1"></div>
+                </div>
+                <div class="weapon-indicator" id="weapon1">Sword</div>
+            </div>
+            <div class="player-info player2">
+                <div>Player 2</div>
+                <div class="health-bar">
+                    <div class="health-fill" id="health2"></div>
+                </div>
+                <div class="weapon-indicator" id="weapon2">Sword</div>
+            </div>
+        </div>
+        <canvas id="gameCanvas" width="1000" height="500"></canvas>
+        <div class="controls">
+            <div class="control-section">
+                <h3>Player 1 (Red)</h3>
+                <div><span class="key">W</span> Jump</div>
+                <div><span class="key">A</span> <span class="key">D</span> Move</div>
+                <div><span class="key">S</span> Attack</div>
+                <div><span class="key">Q</span> Switch Weapon</div>
+                <div><span class="key">E</span> Hold to Aim Bow</div>
+            </div>
+            <div class="control-section">
+                <h3>Player 2 (Blue)</h3>
+                <div><span class="key">↑</span> Jump</div>
+                <div><span class="key">←</span> <span class="key">→</span> Move</div>
+                <div><span class="key">↓</span> Attack</div>
+                <div><span class="key">/</span> Switch Weapon</div>
+                <div><span class="key">.</span> Hold to Aim Bow</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-over" id="gameOver">
+        <h2 id="winnerText">Player 1 Wins!</h2>
+        <button class="restart-btn" onclick="restartGame()">Play Again</button>
+        <button class="restart-btn" onclick="backToMenu()">Main Menu</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game state
+        let gameRunning = false;
+        let groundY = canvas.height - 50;
+        let currentMap = 'classic';
+        let platforms = [];
+        
+        // Platform class for platform maps
+        class Platform {
+            constructor(x, y, width, height, isCloud = false) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.isCloud = isCloud;
+            }
+            
+            draw() {
+                if (this.isCloud) {
+                    // Draw cloud platform
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                    ctx.beginPath();
+                    // Draw cloud shape
+                    const bumps = Math.floor(this.width / 30);
+                    for (let i = 0; i < bumps; i++) {
+                        ctx.arc(this.x + (i * 30) + 15, this.y + 10, 15, 0, Math.PI * 2);
+                    }
+                    ctx.fill();
+                    ctx.fillRect(this.x, this.y + 10, this.width, this.height - 10);
+                } else {
+                    // Draw regular platform
+                    ctx.fillStyle = '#654321';
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                    ctx.fillStyle = '#8B7355';
+                    ctx.fillRect(this.x, this.y, this.width, 5);
+                }
+            }
+            
+            checkCollision(player) {
+                if (player.x + player.width > this.x &&
+                    player.x < this.x + this.width &&
+                    player.y + player.height >= this.y - 5 &&
+                    player.y + player.height <= this.y + 20 &&
+                    player.velocityY >= -0.5) {
+                    player.y = this.y - player.height;
+                    player.velocityY = 0;
+                    player.onGround = true;
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // Weapon types
+        const weapons = {
+            sword: { damage: 15, range: 60, speed: 5, cooldown: 500 },
+            axe: { damage: 25, range: 50, speed: 3, cooldown: 800 },
+            spear: { damage: 10, range: 80, speed: 7, cooldown: 400 },
+            mace: { damage: 20, range: 40, speed: 4, cooldown: 600 }
+        };
+        
+        // Bow settings (separate from main weapons)
+        const bowSettings = { damage: 12, cooldown: 1000 };
+
+        const weaponNames = Object.keys(weapons);
+        
+        // Projectile array
+        const projectiles = [];
+        
+        // Hit effects array
+        const hitEffects = [];
+        
+        // Hit effect class
+        class HitEffect {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 5;
+                this.maxRadius = 30;
+                this.opacity = 1;
+                this.active = true;
+                this.particles = [];
+                
+                // Create particles
+                for (let i = 0; i < 8; i++) {
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vx: Math.cos(i * Math.PI / 4) * 5,
+                        vy: Math.sin(i * Math.PI / 4) * 5 - 2,
+                        size: Math.random() * 3 + 2
+                    });
+                }
+            }
+            
+            update() {
+                this.radius += 2;
+                this.opacity -= 0.05;
+                
+                // Update particles
+                this.particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.3;
+                    p.vx *= 0.95;
+                    p.size *= 0.95;
+                });
+                
+                if (this.opacity <= 0) {
+                    this.active = false;
+                }
+            }
+            
+            draw() {
+                ctx.save();
+                
+                // Draw impact circle
+                ctx.strokeStyle = `rgba(255, 255, 0, ${this.opacity})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Draw particles
+                ctx.fillStyle = `rgba(255, 100, 0, ${this.opacity})`;
+                this.particles.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                ctx.restore();
+            }
+        }
+        
+        function createHitEffect(x, y) {
+            hitEffects.push(new HitEffect(x, y));
+        }
+        
+        function drawTargetingLine(shooter, target) {
+            ctx.save();
+            
+            // Calculate trajectory
+            const startX = shooter.x + shooter.width/2;
+            const startY = shooter.y + 40;
+            const targetX = target.x + target.width/2;
+            const targetY = target.y + target.height/2;
+            
+            // Draw targeting line
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 5]);
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            
+            // Draw curved trajectory preview
+            const steps = 20;
+            const dx = (targetX - startX) / steps;
+            const dy = (targetY - startY) / steps;
+            
+            for (let i = 1; i <= steps; i++) {
+                const x = startX + dx * i;
+                const baseY = startY + dy * i;
+                // Add parabolic curve to show arrow trajectory
+                const curveOffset = Math.sin((i / steps) * Math.PI) * -30;
+                const y = baseY + curveOffset;
+                ctx.lineTo(x, y);
+            }
+            
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Draw target crosshair
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(targetX, targetY, 15, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Draw crosshair lines
+            ctx.beginPath();
+            ctx.moveTo(targetX - 20, targetY);
+            ctx.lineTo(targetX + 20, targetY);
+            ctx.moveTo(targetX, targetY - 20);
+            ctx.lineTo(targetX, targetY + 20);
+            ctx.stroke();
+            
+            // Draw power indicator
+            const power = Math.min(1, shooter.bowCooldown > 0 ? 0 : 1);
+            ctx.fillStyle = power === 1 ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 255, 0, 0.5)';
+            ctx.fillRect(startX - 20, startY - 40, 40 * power, 5);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.strokeRect(startX - 20, startY - 40, 40, 5);
+            
+            ctx.restore();
+        }
+        
+        // Projectile class
+        class Projectile {
+            constructor(x, y, direction, owner, damage) {
+                this.x = x;
+                this.y = y;
+                this.velocityX = direction * 15;
+                this.velocityY = -2;
+                this.width = 20;
+                this.height = 4;
+                this.owner = owner;
+                this.damage = damage;
+                this.active = true;
+            }
+            
+            update() {
+                this.x += this.velocityX;
+                this.velocityY += 0.25; // gravity (balanced)
+                this.y += this.velocityY;
+                
+                // Remove if out of bounds
+                if (this.x < -50 || this.x > canvas.width + 50 || this.y > groundY) {
+                    this.active = false;
+                }
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.strokeStyle = '#8B4513';
+                ctx.lineWidth = 3;
+                // Arrow shaft
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x - this.velocityX * 0.8, this.y - this.velocityY * 0.8);
+                ctx.stroke();
+                
+                // Arrowhead
+                ctx.fillStyle = '#696969';
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x - 8 * Math.sign(this.velocityX), this.y - 3);
+                ctx.lineTo(this.x - 8 * Math.sign(this.velocityX), this.y + 3);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Feathers
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(this.x - this.velocityX * 0.8, this.y - this.velocityY * 0.8);
+                ctx.lineTo(this.x - this.velocityX * 0.8 - 3, this.y - this.velocityY * 0.8 - 3);
+                ctx.moveTo(this.x - this.velocityX * 0.8, this.y - this.velocityY * 0.8);
+                ctx.lineTo(this.x - this.velocityX * 0.8 - 3, this.y - this.velocityY * 0.8 + 3);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // Player class
+        class Player {
+            constructor(x, color, controls) {
+                this.x = x;
+                this.y = groundY - 100;
+                this.width = 30;
+                this.height = 100;
+                this.color = color;
+                this.health = 100;
+                this.maxHealth = 100;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.speed = 5.5;
+                this.jumpPower = 15;
+                this.onGround = false;
+                this.controls = controls;
+                this.facing = 1; // 1 for right, -1 for left
+                this.attacking = false;
+                this.attackCooldown = 0;
+                this.currentWeaponIndex = 0;
+                this.currentWeapon = weaponNames[0];
+                this.attackAngle = 0;
+                this.blocking = false;
+                this.stunned = false;
+                this.stunTimer = 0;
+                this.hitConfirmed = false;
+                this.bowCooldown = 0;
+                this.walkCycle = 0;
+                this.isMoving = false;
+                this.isAiming = false;
+            }
+
+            update() {
+                // Apply gravity (balanced for good jump feel)
+                if (!this.onGround) {
+                    this.velocityY += 0.65;
+                }
+
+                // Update stun
+                if (this.stunned) {
+                    this.stunTimer--;
+                    if (this.stunTimer <= 0) {
+                        this.stunned = false;
+                    }
+                }
+
+                // Update position
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+
+                // Platform and ground collision
+                let onPlatform = false;
+                let wasOnGround = this.onGround;
+                
+                // Check platform collisions
+                for (let platform of platforms) {
+                    if (platform.checkCollision(this)) {
+                        onPlatform = true;
+                        break;
+                    }
+                }
+                
+                // Check ground collision
+                if (!onPlatform) {
+                    if (this.y + this.height >= groundY) {
+                        this.y = groundY - this.height;
+                        this.velocityY = 0;
+                        this.onGround = true;
+                    } else {
+                        // Only set onGround to false if we're clearly in the air
+                        if (this.y + this.height < groundY - 5) {
+                            let stillOnPlatform = false;
+                            for (let platform of platforms) {
+                                if (this.x + this.width > platform.x &&
+                                    this.x < platform.x + platform.width &&
+                                    Math.abs(this.y + this.height - platform.y) < 5) {
+                                    stillOnPlatform = true;
+                                    break;
+                                }
+                            }
+                            if (!stillOnPlatform) {
+                                this.onGround = false;
+                            }
+                        }
+                    }
+                }
+
+                // Wall collision
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+
+                // Friction
+                this.velocityX *= 0.85;
+
+                // Update attack cooldown
+                if (this.attackCooldown > 0) {
+                    this.attackCooldown--;
+                }
+
+                // Update attack animation
+                if (this.attacking) {
+                    this.attackAngle += 0.3;
+                    if (this.attackAngle > Math.PI) {
+                        this.attacking = false;
+                        this.attackAngle = 0;
+                        this.hitConfirmed = false;
+                    }
+                }
+                
+                // Update bow cooldown
+                if (this.bowCooldown > 0) {
+                    this.bowCooldown--;
+                }
+                
+                // Update walk animation
+                this.isMoving = Math.abs(this.velocityX) > 0.5;
+                if (this.isMoving) {
+                    this.walkCycle += 0.18;
+                }
+            }
+
+            draw() {
+                ctx.save();
+
+                // Draw shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.beginPath();
+                ctx.ellipse(this.x + this.width/2, groundY, this.width/2, 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw stick figure body
+                ctx.strokeStyle = this.stunned ? 'gray' : this.color;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+
+                // Head
+                ctx.beginPath();
+                ctx.arc(this.x + this.width/2, this.y + 20, 15, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Body
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width/2, this.y + 35);
+                ctx.lineTo(this.x + this.width/2, this.y + 70);
+                ctx.stroke();
+
+                // Arms
+                if (this.attacking) {
+                    // Attacking arm animation
+                    let armAngle = -this.attackAngle * this.facing;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + this.width/2, this.y + 40);
+                    ctx.lineTo(
+                        this.x + this.width/2 + Math.cos(armAngle) * 30 * this.facing,
+                        this.y + 40 + Math.sin(armAngle) * 30
+                    );
+                    ctx.stroke();
+
+                    // Draw weapon
+                    this.drawWeapon(
+                        this.x + this.width/2 + Math.cos(armAngle) * 30 * this.facing,
+                        this.y + 40 + Math.sin(armAngle) * 30,
+                        armAngle
+                    );
+                } else {
+                    // Animated arms based on movement state
+                    if (!this.onGround) {
+                        // Arms up when jumping
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + this.width/2, this.y + 40);
+                        ctx.lineTo(this.x + this.width/2 - 15, this.y + 20);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + this.width/2, this.y + 40);
+                        ctx.lineTo(this.x + this.width/2 + 15, this.y + 20);
+                        ctx.stroke();
+                    } else if (this.isMoving) {
+                        // Swaying arms when walking (opposite to legs)
+                        const armSwing = Math.sin(this.walkCycle + Math.PI) * 15;
+                        const armSwing2 = Math.sin(this.walkCycle) * 15;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + this.width/2, this.y + 40);
+                        ctx.lineTo(this.x + this.width/2 - 20 + armSwing, this.y + 60);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + this.width/2, this.y + 40);
+                        ctx.lineTo(this.x + this.width/2 + 20 + armSwing2, this.y + 60);
+                        ctx.stroke();
+                    } else {
+                        // Normal resting arms
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + this.width/2, this.y + 40);
+                        ctx.lineTo(this.x + this.width/2 - 20, this.y + 60);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + this.width/2, this.y + 40);
+                        ctx.lineTo(this.x + this.width/2 + 20, this.y + 60);
+                        ctx.stroke();
+                    }
+                }
+
+                // Legs with walking animation
+                const legOffset = this.isMoving ? Math.sin(this.walkCycle) * 10 : 0;
+                const legOffset2 = this.isMoving ? Math.sin(this.walkCycle + Math.PI) * 10 : 0;
+                
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width/2, this.y + 70);
+                ctx.lineTo(this.x + this.width/2 - 15 + legOffset, this.y + this.height);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width/2, this.y + 70);
+                ctx.lineTo(this.x + this.width/2 + 15 + legOffset2, this.y + this.height);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            drawWeapon(x, y, angle) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(angle);
+                ctx.strokeStyle = '#8B4513';
+                ctx.lineWidth = 5;
+
+                const weapon = weapons[this.currentWeapon];
+
+                switch(this.currentWeapon) {
+                    case 'sword':
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(weapon.range * this.facing, 0);
+                        ctx.stroke();
+                        // Sword guard
+                        ctx.strokeStyle = '#696969';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(10 * this.facing, -5);
+                        ctx.lineTo(10 * this.facing, 5);
+                        ctx.stroke();
+                        break;
+                    case 'axe':
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(weapon.range * this.facing, 0);
+                        ctx.stroke();
+                        // Axe head
+                        ctx.fillStyle = '#696969';
+                        ctx.beginPath();
+                        ctx.moveTo(weapon.range * this.facing, 0);
+                        ctx.lineTo((weapon.range - 10) * this.facing, -10);
+                        ctx.lineTo((weapon.range - 10) * this.facing, 10);
+                        ctx.closePath();
+                        ctx.fill();
+                        break;
+                    case 'spear':
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(weapon.range * this.facing, 0);
+                        ctx.stroke();
+                        // Spear tip
+                        ctx.fillStyle = '#696969';
+                        ctx.beginPath();
+                        ctx.moveTo(weapon.range * this.facing, 0);
+                        ctx.lineTo((weapon.range - 15) * this.facing, -5);
+                        ctx.lineTo((weapon.range - 15) * this.facing, 5);
+                        ctx.closePath();
+                        ctx.fill();
+                        break;
+                    case 'mace':
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(weapon.range * this.facing, 0);
+                        ctx.stroke();
+                        // Mace head
+                        ctx.fillStyle = '#696969';
+                        ctx.beginPath();
+                        ctx.arc(weapon.range * this.facing, 0, 8, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+                }
+
+                ctx.restore();
+            }
+            
+            shootBow(target) {
+                if (this.bowCooldown > 0) return;
+                
+                // Calculate direction to target
+                const dx = (target.x + target.width/2) - (this.x + this.width/2);
+                const dy = (target.y + target.height/2) - (this.y + this.height/2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Calculate velocity to hit target
+                const speed = 12;
+                const vx = (dx / distance) * speed;
+                const vy = (dy / distance) * speed - 3; // Compensate for gravity
+                
+                const arrow = new Projectile(
+                    this.x + this.width/2,
+                    this.y + 40,
+                    Math.sign(dx),
+                    this,
+                    bowSettings.damage
+                );
+                arrow.velocityX = vx;
+                arrow.velocityY = vy;
+                projectiles.push(arrow);
+                
+                this.bowCooldown = bowSettings.cooldown / 10;
+            }
+
+            jump() {
+                if (this.onGround && !this.stunned) {
+                    this.velocityY = -this.jumpPower;
+                }
+            }
+
+            moveLeft() {
+                if (!this.stunned) {
+                    this.velocityX = -this.speed;
+                    this.facing = -1;
+                }
+            }
+
+            moveRight() {
+                if (!this.stunned) {
+                    this.velocityX = this.speed;
+                    this.facing = 1;
+                }
+            }
+
+            attack() {
+                if (this.attackCooldown === 0 && !this.attacking && !this.stunned) {
+                    this.attacking = true;
+                    this.attackCooldown = weapons[this.currentWeapon].cooldown / 10;
+                }
+            }
+
+            switchWeapon() {
+                this.currentWeaponIndex = (this.currentWeaponIndex + 1) % weaponNames.length;
+                this.currentWeapon = weaponNames[this.currentWeaponIndex];
+            }
+
+            takeDamage(damage) {
+                this.health -= damage;
+                if (this.health < 0) this.health = 0;
+                this.stunned = true;
+                this.stunTimer = 10;
+                // Knockback
+                this.velocityX = -this.facing * 5;
+                this.velocityY = -5;
+            }
+
+            getWeaponHitbox() {
+                if (!this.attacking) return null;
+                const weapon = weapons[this.currentWeapon];
+                
+                // Calculate weapon position based on attack angle
+                const armLength = 30;
+                const armAngle = -this.attackAngle * this.facing;
+                const weaponStartX = this.x + this.width/2 + Math.cos(armAngle) * armLength * this.facing;
+                const weaponStartY = this.y + 40 + Math.sin(armAngle) * armLength;
+                const weaponEndX = weaponStartX + Math.cos(armAngle) * weapon.range * this.facing;
+                const weaponEndY = weaponStartY + Math.sin(armAngle) * weapon.range;
+                
+                // Create hitbox around weapon line
+                const minX = Math.min(weaponStartX, weaponEndX);
+                const maxX = Math.max(weaponStartX, weaponEndX);
+                const minY = Math.min(weaponStartY, weaponEndY) - 10;
+                const maxY = Math.max(weaponStartY, weaponEndY) + 10;
+                
+                return {
+                    x: minX,
+                    y: minY,
+                    width: maxX - minX,
+                    height: maxY - minY
+                };
+            }
+        }
+
+        // Create players
+        const player1 = new Player(200, '#dc143c', {
+            jump: 'w',
+            left: 'a',
+            right: 'd',
+            attack: 's',
+            switchWeapon: 'q',
+            bow: 'e'
+        });
+
+        const player2 = new Player(800, '#0000ff', {
+            jump: 'ArrowUp',
+            left: 'ArrowLeft',
+            right: 'ArrowRight',
+            attack: 'ArrowDown',
+            switchWeapon: '/',
+            bow: '.'
+        });
+
+        // Input handling
+        const keys = {};
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            
+            // Weapon switching
+            if (e.key.toLowerCase() === player1.controls.switchWeapon) {
+                player1.switchWeapon();
+                document.getElementById('weapon1').textContent = 
+                    player1.currentWeapon.charAt(0).toUpperCase() + player1.currentWeapon.slice(1);
+            }
+            if (e.key === player2.controls.switchWeapon) {
+                player2.switchWeapon();
+                document.getElementById('weapon2').textContent = 
+                    player2.currentWeapon.charAt(0).toUpperCase() + player2.currentWeapon.slice(1);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        function handleInput() {
+            // Player 1 controls
+            if (keys[player1.controls.jump]) player1.jump();
+            if (keys[player1.controls.left]) player1.moveLeft();
+            if (keys[player1.controls.right]) player1.moveRight();
+            if (keys[player1.controls.attack]) player1.attack();
+            
+            // Handle bow for player 1
+            if (keys[player1.controls.bow]) {
+                if (!player1.isAiming) {
+                    player1.isAiming = true;
+                }
+            } else if (player1.isAiming) {
+                player1.shootBow(player2);
+                player1.isAiming = false;
+            }
+
+            // Player 2 controls
+            if (keys[player2.controls.jump.toLowerCase()]) player2.jump();
+            if (keys[player2.controls.left.toLowerCase()]) player2.moveLeft();
+            if (keys[player2.controls.right.toLowerCase()]) player2.moveRight();
+            if (keys[player2.controls.attack.toLowerCase()]) player2.attack();
+            
+            // Handle bow for player 2
+            if (keys[player2.controls.bow]) {
+                if (!player2.isAiming) {
+                    player2.isAiming = true;
+                }
+            } else if (player2.isAiming) {
+                player2.shootBow(player1);
+                player2.isAiming = false;
+            }
+        }
+
+        function checkCollisions() {
+            // Check weapon collisions
+            if (player1.attacking) {
+                const hitbox = player1.getWeaponHitbox();
+                if (hitbox && checkHit(hitbox, player2) && !player1.hitConfirmed) {
+                    player2.takeDamage(weapons[player1.currentWeapon].damage);
+                    player1.hitConfirmed = true;
+                    createHitEffect(player2.x + player2.width/2, player2.y + player2.height/2);
+                }
+            }
+
+            if (player2.attacking) {
+                const hitbox = player2.getWeaponHitbox();
+                if (hitbox && checkHit(hitbox, player1) && !player2.hitConfirmed) {
+                    player1.takeDamage(weapons[player2.currentWeapon].damage);
+                    player2.hitConfirmed = true;
+                    createHitEffect(player1.x + player1.width/2, player1.y + player1.height/2);
+                }
+            }
+            
+            // Check projectile collisions
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const proj = projectiles[i];
+                
+                // Check collision with players
+                const target = proj.owner === player1 ? player2 : player1;
+                if (checkProjectileHit(proj, target)) {
+                    target.takeDamage(proj.damage);
+                    createHitEffect(target.x + target.width/2, target.y + target.height/2);
+                    projectiles.splice(i, 1);
+                }
+            }
+        }
+        
+        function checkProjectileHit(proj, player) {
+            return proj.x < player.x + player.width &&
+                   proj.x + proj.width > player.x &&
+                   proj.y < player.y + player.height &&
+                   proj.y + proj.height > player.y;
+        }
+        
+        function checkPlayerCollision() {
+            // Check if players are overlapping
+            if (player1.x < player2.x + player2.width &&
+                player1.x + player1.width > player2.x &&
+                player1.y < player2.y + player2.height &&
+                player1.y + player1.height > player2.y) {
+                
+                // Calculate overlap and push players apart
+                const overlap = (player1.x + player1.width/2 < player2.x + player2.width/2) ?
+                    (player1.x + player1.width) - player2.x :
+                    (player2.x + player2.width) - player1.x;
+                
+                const pushDistance = overlap / 2;
+                
+                if (player1.x + player1.width/2 < player2.x + player2.width/2) {
+                    // Player 1 is on the left
+                    player1.x -= pushDistance;
+                    player2.x += pushDistance;
+                    player1.velocityX -= 2;
+                    player2.velocityX += 2;
+                } else {
+                    // Player 1 is on the right
+                    player1.x += pushDistance;
+                    player2.x -= pushDistance;
+                    player1.velocityX += 2;
+                    player2.velocityX -= 2;
+                }
+            }
+        }
+
+        function checkHit(hitbox, player) {
+            if (!hitbox) return false;
+            return hitbox.x < player.x + player.width &&
+                   hitbox.x + hitbox.width > player.x &&
+                   hitbox.y < player.y + player.height &&
+                   hitbox.y + hitbox.height > player.y;
+        }
+
+        function updateHealthBars() {
+            document.getElementById('health1').style.width = `${(player1.health / player1.maxHealth) * 100}%`;
+            document.getElementById('health2').style.width = `${(player2.health / player2.maxHealth) * 100}%`;
+        }
+
+        function checkGameOver() {
+            if (player1.health <= 0 || player2.health <= 0) {
+                gameRunning = false;
+                const winner = player1.health > 0 ? 'Player 1' : 'Player 2';
+                document.getElementById('winnerText').textContent = `${winner} Wins!`;
+                document.getElementById('gameOver').style.display = 'block';
+            }
+        }
+
+        function selectMap(mapName) {
+            currentMap = mapName;
+            document.querySelectorAll('.map-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            document.getElementById('map-' + mapName).classList.add('selected');
+        }
+        
+        function startGame() {
+            // Hide menu, show game
+            document.getElementById('mainMenu').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'block';
+            
+            // Initialize map
+            platforms = [];
+            if (currentMap === 'platform') {
+                platforms.push(new Platform(canvas.width/2 - 100, groundY - 150, 200, 20));
+            } else if (currentMap === 'skylands') {
+                // Create cloud platforms
+                platforms.push(new Platform(100, 250, 150, 20, true));
+                platforms.push(new Platform(300, 150, 120, 20, true));
+                platforms.push(new Platform(500, 200, 150, 20, true));
+                platforms.push(new Platform(750, 250, 150, 20, true));
+                platforms.push(new Platform(400, 350, 200, 20, true));
+                // Keep ground as a safety net
+            }
+            
+            // Reset players
+            player1.health = player1.maxHealth;
+            player2.health = player2.maxHealth;
+            player1.x = 200;
+            player2.x = 800;
+            player1.y = groundY - 100;
+            player2.y = groundY - 100;
+            player1.velocityX = 0;
+            player1.velocityY = 0;
+            player2.velocityX = 0;
+            player2.velocityY = 0;
+            player1.stunned = false;
+            player2.stunned = false;
+            player1.attacking = false;
+            player2.attacking = false;
+            player1.attackAngle = 0;
+            player2.attackAngle = 0;
+            player1.hitConfirmed = false;
+            player2.hitConfirmed = false;
+            
+            // Clear projectiles and effects
+            projectiles.length = 0;
+            hitEffects.length = 0;
+            
+            gameRunning = true;
+            updateHealthBars();
+            
+            // Start game loop if not already running
+            if (!gameLoopRunning) {
+                gameLoopRunning = true;
+                gameLoop();
+            }
+        }
+        
+        function backToMenu() {
+            gameRunning = false;
+            document.getElementById('gameContainer').style.display = 'none';
+            document.getElementById('mainMenu').style.display = 'block';
+            document.getElementById('gameOver').style.display = 'none';
+        }
+        
+        function restartGame() {
+            player1.health = player1.maxHealth;
+            player2.health = player2.maxHealth;
+            player1.x = 200;
+            player2.x = 800;
+            player1.y = groundY - 100;
+            player2.y = groundY - 100;
+            player1.velocityX = 0;
+            player1.velocityY = 0;
+            player2.velocityX = 0;
+            player2.velocityY = 0;
+            player1.stunned = false;
+            player2.stunned = false;
+            player1.attacking = false;
+            player2.attacking = false;
+            player1.attackAngle = 0;
+            player2.attackAngle = 0;
+            player1.hitConfirmed = false;
+            player2.hitConfirmed = false;
+            
+            // Clear projectiles and effects
+            projectiles.length = 0;
+            hitEffects.length = 0;
+            
+            gameRunning = true;
+            document.getElementById('gameOver').style.display = 'none';
+            updateHealthBars();
+        }
+
+        function drawBackground() {
+            // Sky gradient is handled by canvas CSS
+            
+            // Draw ground
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+            
+            // Draw grass
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, groundY, canvas.width, 5);
+            
+            // Draw some static clouds
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.beginPath();
+            ctx.arc(150, 80, 25, 0, Math.PI * 2);
+            ctx.arc(180, 85, 30, 0, Math.PI * 2);
+            ctx.arc(210, 80, 25, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(750, 100, 20, 0, Math.PI * 2);
+            ctx.arc(775, 105, 25, 0, Math.PI * 2);
+            ctx.arc(800, 100, 20, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw platforms
+            platforms.forEach(platform => platform.draw());
+        }
+
+        function gameLoop() {
+            if (!gameRunning) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw background
+            drawBackground();
+
+            // Handle input
+            handleInput();
+
+            // Update players
+            player1.update();
+            player2.update();
+            
+            // Update projectiles
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                projectiles[i].update();
+                if (!projectiles[i].active) {
+                    projectiles.splice(i, 1);
+                }
+            }
+            
+            // Update hit effects
+            for (let i = hitEffects.length - 1; i >= 0; i--) {
+                hitEffects[i].update();
+                if (!hitEffects[i].active) {
+                    hitEffects.splice(i, 1);
+                }
+            }
+
+            // Check collisions
+            checkCollisions();
+            checkPlayerCollision();
+
+            // Draw players
+            player1.draw();
+            player2.draw();
+            
+            // Draw targeting indicators
+            if (player1.isAiming) {
+                drawTargetingLine(player1, player2);
+            }
+            if (player2.isAiming) {
+                drawTargetingLine(player2, player1);
+            }
+            
+            // Draw projectiles
+            projectiles.forEach(proj => proj.draw());
+            
+            // Draw hit effects
+            hitEffects.forEach(effect => effect.draw());
+
+            // Update UI
+            updateHealthBars();
+            checkGameOver();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Game loop running flag
+        let gameLoopRunning = false;
+        
+        // Initialize health bars
+        updateHealthBars();
+    </script>
+</body>
+</html>
