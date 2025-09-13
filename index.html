@@ -18,7 +18,7 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            overflow: hidden;
+            overflow: auto;
         }
 
         .game-container {
@@ -102,7 +102,7 @@
             border: 3px solid rgba(255, 255, 255, 0.3);
             border-radius: 10px;
             display: block;
-            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
+            background: linear-gradient(to bottom, #87CEEB 0%, #003366 100%);
         }
 
         .game-info {
@@ -127,6 +127,10 @@
 
         .player2 {
             background: rgba(0, 0, 255, 0.3);
+        }
+
+        .player3 {
+            background: rgba(0, 255, 0, 0.3);
         }
 
         .health-bar {
@@ -219,7 +223,12 @@
 <body>
     <div class="main-menu" id="mainMenu">
         <h1>Medieval Stick Fighter</h1>
-        <div class="map-selection">
+        <div class="player-selection" id="playerSelection">
+            <h3>Select Number of Players:</h3>
+            <button class="menu-button" onclick="selectPlayerCount(2)">2 Players</button>
+            <button class="menu-button" onclick="selectPlayerCount(3)">3 Players</button>
+        </div>
+        <div class="map-selection" style="display: none;" id="mapSelection">
             <h3>Select Map:</h3>
             <div class="map-option selected" onclick="selectMap('classic')" id="map-classic">
                 <div class="map-name">Classic Arena</div>
@@ -253,6 +262,13 @@
                 </div>
                 <div class="weapon-indicator" id="weapon2">Sword</div>
             </div>
+            <div class="player-info player3" id="player3Info" style="display: none;">
+                <div>Player 3</div>
+                <div class="health-bar">
+                    <div class="health-fill" id="health3"></div>
+                </div>
+                <div class="weapon-indicator" id="weapon3">Sword</div>
+            </div>
         </div>
         <canvas id="gameCanvas" width="1000" height="500"></canvas>
         <div class="controls">
@@ -272,6 +288,14 @@
                 <div><span class="key">/</span> Switch Weapon</div>
                 <div><span class="key">.</span> Hold to Aim Bow</div>
             </div>
+            <div class="control-section" id="player3Controls" style="display: none;">
+                <h3>Player 3 (Green)</h3>
+                <div><span class="key">I</span> Jump</div>
+                <div><span class="key">J</span> <span class="key">L</span> Move</div>
+                <div><span class="key">K</span> Attack</div>
+                <div><span class="key">U</span> Switch Weapon</div>
+                <div><span class="key">O</span> Hold to Aim Bow</div>
+            </div>
         </div>
     </div>
 
@@ -290,6 +314,8 @@
         let groundY = canvas.height - 50;
         let currentMap = 'classic';
         let platforms = [];
+        let playerCount = 2;
+        let player3 = null;
         
         // Platform class for platform maps
         class Platform {
@@ -942,6 +968,8 @@
             bow: '.'
         });
 
+        // Player 3 will be created when 3-player mode is selected
+
         // Input handling
         const keys = {};
 
@@ -951,19 +979,47 @@
             // Weapon switching
             if (e.key.toLowerCase() === player1.controls.switchWeapon) {
                 player1.switchWeapon();
-                document.getElementById('weapon1').textContent = 
+                document.getElementById('weapon1').textContent =
                     player1.currentWeapon.charAt(0).toUpperCase() + player1.currentWeapon.slice(1);
             }
             if (e.key === player2.controls.switchWeapon) {
                 player2.switchWeapon();
-                document.getElementById('weapon2').textContent = 
+                document.getElementById('weapon2').textContent =
                     player2.currentWeapon.charAt(0).toUpperCase() + player2.currentWeapon.slice(1);
+            }
+            if (playerCount === 3 && player3 && e.key.toLowerCase() === player3.controls.switchWeapon) {
+                player3.switchWeapon();
+                document.getElementById('weapon3').textContent =
+                    player3.currentWeapon.charAt(0).toUpperCase() + player3.currentWeapon.slice(1);
             }
         });
 
         document.addEventListener('keyup', (e) => {
             keys[e.key.toLowerCase()] = false;
         });
+
+        function getNearestTarget(shooter) {
+            const players = [player1, player2];
+            if (playerCount === 3 && player3) players.push(player3);
+
+            let nearestTarget = null;
+            let minDistance = Infinity;
+
+            for (const player of players) {
+                if (player === shooter) continue;
+
+                const dx = player.x - shooter.x;
+                const dy = player.y - shooter.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestTarget = player;
+                }
+            }
+
+            return nearestTarget;
+        }
 
         function handleInput() {
             // Player 1 controls
@@ -978,7 +1034,8 @@
                     player1.isAiming = true;
                 }
             } else if (player1.isAiming) {
-                player1.shootBow(player2);
+                const target = playerCount === 3 ? getNearestTarget(player1) : player2;
+                player1.shootBow(target);
                 player1.isAiming = false;
             }
 
@@ -994,41 +1051,70 @@
                     player2.isAiming = true;
                 }
             } else if (player2.isAiming) {
-                player2.shootBow(player1);
+                const target = playerCount === 3 ? getNearestTarget(player2) : player1;
+                player2.shootBow(target);
                 player2.isAiming = false;
+            }
+
+            // Player 3 controls (if active)
+            if (playerCount === 3 && player3) {
+                if (keys[player3.controls.jump]) player3.jump();
+                if (keys[player3.controls.left]) player3.moveLeft();
+                if (keys[player3.controls.right]) player3.moveRight();
+                if (keys[player3.controls.attack]) player3.attack();
+
+                // Handle bow for player 3
+                if (keys[player3.controls.bow]) {
+                    if (!player3.isAiming) {
+                        player3.isAiming = true;
+                    }
+                } else if (player3.isAiming) {
+                    const target = getNearestTarget(player3);
+                    player3.shootBow(target);
+                    player3.isAiming = false;
+                }
             }
         }
 
         function checkCollisions() {
-            // Check weapon collisions
-            if (player1.attacking) {
-                const hitbox = player1.getWeaponHitbox();
-                if (hitbox && checkHit(hitbox, player2) && !player1.hitConfirmed) {
-                    player2.takeDamage(weapons[player1.currentWeapon].damage);
-                    player1.hitConfirmed = true;
-                    createHitEffect(player2.x + player2.width/2, player2.y + player2.height/2);
-                }
-            }
+            const players = [player1, player2];
+            if (playerCount === 3 && player3) players.push(player3);
 
-            if (player2.attacking) {
-                const hitbox = player2.getWeaponHitbox();
-                if (hitbox && checkHit(hitbox, player1) && !player2.hitConfirmed) {
-                    player1.takeDamage(weapons[player2.currentWeapon].damage);
-                    player2.hitConfirmed = true;
-                    createHitEffect(player1.x + player1.width/2, player1.y + player1.height/2);
+            // Check weapon collisions for all players
+            for (let i = 0; i < players.length; i++) {
+                const attacker = players[i];
+                if (attacker.attacking) {
+                    const hitbox = attacker.getWeaponHitbox();
+                    if (hitbox && !attacker.hitConfirmed) {
+                        for (let j = 0; j < players.length; j++) {
+                            if (i !== j) {
+                                const target = players[j];
+                                if (checkHit(hitbox, target)) {
+                                    target.takeDamage(weapons[attacker.currentWeapon].damage);
+                                    attacker.hitConfirmed = true;
+                                    createHitEffect(target.x + target.width/2, target.y + target.height/2);
+                                    break; // Only hit one target per attack
+                                }
+                            }
+                        }
+                    }
                 }
             }
             
             // Check projectile collisions
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 const proj = projectiles[i];
-                
-                // Check collision with players
-                const target = proj.owner === player1 ? player2 : player1;
-                if (checkProjectileHit(proj, target)) {
-                    target.takeDamage(proj.damage);
-                    createHitEffect(target.x + target.width/2, target.y + target.height/2);
-                    projectiles.splice(i, 1);
+
+                // Check collision with all players except owner
+                for (const player of players) {
+                    if (player !== proj.owner) {
+                        if (checkProjectileHit(proj, player)) {
+                            player.takeDamage(proj.damage);
+                            createHitEffect(player.x + player.width/2, player.y + player.height/2);
+                            projectiles.splice(i, 1);
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -1041,31 +1127,41 @@
         }
         
         function checkPlayerCollision() {
-            // Check if players are overlapping
-            if (player1.x < player2.x + player2.width &&
-                player1.x + player1.width > player2.x &&
-                player1.y < player2.y + player2.height &&
-                player1.y + player1.height > player2.y) {
-                
-                // Calculate overlap and push players apart
-                const overlap = (player1.x + player1.width/2 < player2.x + player2.width/2) ?
-                    (player1.x + player1.width) - player2.x :
-                    (player2.x + player2.width) - player1.x;
-                
-                const pushDistance = overlap / 2;
-                
-                if (player1.x + player1.width/2 < player2.x + player2.width/2) {
-                    // Player 1 is on the left
-                    player1.x -= pushDistance;
-                    player2.x += pushDistance;
-                    player1.velocityX -= 2;
-                    player2.velocityX += 2;
-                } else {
-                    // Player 1 is on the right
-                    player1.x += pushDistance;
-                    player2.x -= pushDistance;
-                    player1.velocityX += 2;
-                    player2.velocityX -= 2;
+            const players = [player1, player2];
+            if (playerCount === 3 && player3) players.push(player3);
+
+            // Check collisions between all pairs of players
+            for (let i = 0; i < players.length; i++) {
+                for (let j = i + 1; j < players.length; j++) {
+                    const p1 = players[i];
+                    const p2 = players[j];
+
+                    if (p1.x < p2.x + p2.width &&
+                        p1.x + p1.width > p2.x &&
+                        p1.y < p2.y + p2.height &&
+                        p1.y + p1.height > p2.y) {
+
+                        // Calculate overlap and push players apart
+                        const overlap = (p1.x + p1.width/2 < p2.x + p2.width/2) ?
+                            (p1.x + p1.width) - p2.x :
+                            (p2.x + p2.width) - p1.x;
+
+                        const pushDistance = overlap / 2;
+
+                        if (p1.x + p1.width/2 < p2.x + p2.width/2) {
+                            // p1 is on the left
+                            p1.x -= pushDistance;
+                            p2.x += pushDistance;
+                            p1.velocityX -= 2;
+                            p2.velocityX += 2;
+                        } else {
+                            // p1 is on the right
+                            p1.x += pushDistance;
+                            p2.x -= pushDistance;
+                            p1.velocityX += 2;
+                            p2.velocityX -= 2;
+                        }
+                    }
                 }
             }
         }
@@ -1081,14 +1177,40 @@
         function updateHealthBars() {
             document.getElementById('health1').style.width = `${(player1.health / player1.maxHealth) * 100}%`;
             document.getElementById('health2').style.width = `${(player2.health / player2.maxHealth) * 100}%`;
+            if (playerCount === 3 && player3) {
+                document.getElementById('health3').style.width = `${(player3.health / player3.maxHealth) * 100}%`;
+            }
         }
 
         function checkGameOver() {
-            if (player1.health <= 0 || player2.health <= 0) {
+            const alivePlayers = [];
+            if (player1.health > 0) alivePlayers.push('Player 1');
+            if (player2.health > 0) alivePlayers.push('Player 2');
+            if (playerCount === 3 && player3 && player3.health > 0) alivePlayers.push('Player 3');
+
+            if (alivePlayers.length <= 1) {
                 gameRunning = false;
-                const winner = player1.health > 0 ? 'Player 1' : 'Player 2';
+                const winner = alivePlayers.length === 1 ? alivePlayers[0] : 'No one';
                 document.getElementById('winnerText').textContent = `${winner} Wins!`;
                 document.getElementById('gameOver').style.display = 'block';
+            }
+        }
+
+        function selectPlayerCount(count) {
+            playerCount = count;
+            document.getElementById('playerSelection').style.display = 'none';
+            document.getElementById('mapSelection').style.display = 'block';
+
+            // Create player 3 if needed
+            if (playerCount === 3) {
+                player3 = new Player(500, '#228B22', {
+                    jump: 'i',
+                    left: 'j',
+                    right: 'l',
+                    attack: 'k',
+                    switchWeapon: 'u',
+                    bow: 'o'
+                });
             }
         }
 
@@ -1104,7 +1226,16 @@
             // Hide menu, show game
             document.getElementById('mainMenu').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'block';
-            
+
+            // Show/hide player 3 UI elements
+            if (playerCount === 3) {
+                document.getElementById('player3Info').style.display = 'block';
+                document.getElementById('player3Controls').style.display = 'block';
+            } else {
+                document.getElementById('player3Info').style.display = 'none';
+                document.getElementById('player3Controls').style.display = 'none';
+            }
+
             // Initialize map
             platforms = [];
             if (currentMap === 'platform') {
@@ -1118,12 +1249,12 @@
                 platforms.push(new Platform(400, 350, 200, 20, true));
                 // Keep ground as a safety net
             }
-            
+
             // Reset players
             player1.health = player1.maxHealth;
             player2.health = player2.maxHealth;
-            player1.x = 200;
-            player2.x = 800;
+            player1.x = playerCount === 3 ? 150 : 200;
+            player2.x = playerCount === 3 ? 850 : 800;
             player1.y = groundY - 100;
             player2.y = groundY - 100;
             player1.velocityX = 0;
@@ -1138,6 +1269,19 @@
             player2.attackAngle = 0;
             player1.hitConfirmed = false;
             player2.hitConfirmed = false;
+
+            // Reset player 3 if active
+            if (playerCount === 3 && player3) {
+                player3.health = player3.maxHealth;
+                player3.x = 500;
+                player3.y = groundY - 100;
+                player3.velocityX = 0;
+                player3.velocityY = 0;
+                player3.stunned = false;
+                player3.attacking = false;
+                player3.attackAngle = 0;
+                player3.hitConfirmed = false;
+            }
             
             // Clear projectiles and effects
             projectiles.length = 0;
@@ -1158,13 +1302,16 @@
             document.getElementById('gameContainer').style.display = 'none';
             document.getElementById('mainMenu').style.display = 'block';
             document.getElementById('gameOver').style.display = 'none';
+            // Reset to player selection
+            document.getElementById('playerSelection').style.display = 'block';
+            document.getElementById('mapSelection').style.display = 'none';
         }
         
         function restartGame() {
             player1.health = player1.maxHealth;
             player2.health = player2.maxHealth;
-            player1.x = 200;
-            player2.x = 800;
+            player1.x = playerCount === 3 ? 150 : 200;
+            player2.x = playerCount === 3 ? 850 : 800;
             player1.y = groundY - 100;
             player2.y = groundY - 100;
             player1.velocityX = 0;
@@ -1179,6 +1326,19 @@
             player2.attackAngle = 0;
             player1.hitConfirmed = false;
             player2.hitConfirmed = false;
+
+            // Reset player 3 if active
+            if (playerCount === 3 && player3) {
+                player3.health = player3.maxHealth;
+                player3.x = 500;
+                player3.y = groundY - 100;
+                player3.velocityX = 0;
+                player3.velocityY = 0;
+                player3.stunned = false;
+                player3.attacking = false;
+                player3.attackAngle = 0;
+                player3.hitConfirmed = false;
+            }
             
             // Clear projectiles and effects
             projectiles.length = 0;
@@ -1236,6 +1396,9 @@
             // Update players
             player1.update();
             player2.update();
+            if (playerCount === 3 && player3) {
+                player3.update();
+            }
             
             // Update projectiles
             for (let i = projectiles.length - 1; i >= 0; i--) {
@@ -1260,13 +1423,22 @@
             // Draw players
             player1.draw();
             player2.draw();
-            
+            if (playerCount === 3 && player3) {
+                player3.draw();
+            }
+
             // Draw targeting indicators
             if (player1.isAiming) {
-                drawTargetingLine(player1, player2);
+                const target = playerCount === 3 ? getNearestTarget(player1) : player2;
+                drawTargetingLine(player1, target);
             }
             if (player2.isAiming) {
-                drawTargetingLine(player2, player1);
+                const target = playerCount === 3 ? getNearestTarget(player2) : player1;
+                drawTargetingLine(player2, target);
+            }
+            if (playerCount === 3 && player3 && player3.isAiming) {
+                const target = getNearestTarget(player3);
+                drawTargetingLine(player3, target);
             }
             
             // Draw projectiles
