@@ -291,6 +291,7 @@
                 <div><span class="key">S</span> Attack</div>
                 <div><span class="key">Q</span> Switch Weapon</div>
                 <div><span class="key">E</span> Hold to Aim Bow</div>
+                <div><span class="key">E+Q</span> Fire Blast</div>
             </div>
             <div class="control-section">
                 <h3>Player 2 (Blue)</h3>
@@ -299,6 +300,7 @@
                 <div><span class="key">↓</span> Attack</div>
                 <div><span class="key">/</span> Switch Weapon</div>
                 <div><span class="key">.</span> Hold to Aim Bow</div>
+                <div><span class="key">.+/</span> Ice Blast</div>
             </div>
             <div class="control-section" id="player3Controls" style="display: none;">
                 <h3>Player 3 (Green)</h3>
@@ -307,11 +309,13 @@
                 <div><span class="key">K</span> Attack</div>
                 <div><span class="key">U</span> Switch Weapon</div>
                 <div><span class="key">O</span> Hold to Aim Bow</div>
+                <div><span class="key">O+U</span> Earth Blast</div>
             </div>
             <div class="control-section" id="player4Controls" style="display: none;">
                 <h3>Player 4 (Brown)</h3>
                 <div>AI Controlled</div>
                 <div>Automatically fights</div>
+                <div>Casts Dark Magic</div>
             </div>
         </div>
     </div>
@@ -392,10 +396,14 @@
         // Bow settings (separate from main weapons)
         const bowSettings = { damage: 12, cooldown: 1000 };
 
+        // Magic settings
+        const magicSettings = { damage: 20, cooldown: 1500, speed: 10 };
+
         const weaponNames = Object.keys(weapons);
         
-        // Projectile array
+        // Projectile arrays
         const projectiles = [];
+        const magicBlasts = [];
         
         // Hit effects array
         const hitEffects = [];
@@ -525,6 +533,208 @@
             ctx.restore();
         }
         
+        // Magic Blast class
+        class MagicBlast {
+            constructor(x, y, direction, owner, type, target = null) {
+                this.x = x;
+                this.y = y;
+                this.velocityX = direction * magicSettings.speed;
+                this.velocityY = 0;
+                this.width = 30;
+                this.height = 30;
+                this.owner = owner;
+                this.damage = magicSettings.damage;
+                this.type = type; // 'fire', 'ice', 'earth', 'dark'
+                this.active = true;
+                this.rotation = 0;
+                this.particles = [];
+                this.lifetime = 100;
+                this.target = target;
+
+                // For earth spikes
+                if (this.type === 'earth' && target) {
+                    this.x = target.x + target.width/2;
+                    this.y = groundY;
+                    this.velocityX = 0;
+                    this.velocityY = -15; // Spike shoots up
+                    this.width = 20;
+                    this.height = 60;
+                }
+            }
+
+            update() {
+                if (this.type === 'earth') {
+                    // Earth spike behavior
+                    this.y += this.velocityY;
+                    this.velocityY += 0.5; // Slow down as it rises
+
+                    if (this.velocityY > 0) {
+                        // Start falling back down
+                        this.active = false;
+                    }
+                } else {
+                    // Heat-seeking for fire, ice, and dark
+                    if ((this.type === 'fire' || this.type === 'ice' || this.type === 'dark') && this.target && this.target.health > 0) {
+                        const dx = (this.target.x + this.target.width/2) - this.x;
+                        const dy = (this.target.y + this.target.height/2) - this.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance > 5) {
+                            // Adjust velocity to track target
+                            const trackingSpeed = 0.15; // How aggressively it tracks
+                            this.velocityX += (dx / distance) * trackingSpeed * magicSettings.speed;
+                            this.velocityY += (dy / distance) * trackingSpeed * magicSettings.speed;
+
+                            // Limit max speed
+                            const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+                            if (currentSpeed > magicSettings.speed * 1.5) {
+                                this.velocityX = (this.velocityX / currentSpeed) * magicSettings.speed * 1.5;
+                                this.velocityY = (this.velocityY / currentSpeed) * magicSettings.speed * 1.5;
+                            }
+                        }
+                    }
+
+                    this.x += this.velocityX;
+                    this.y += this.velocityY;
+                }
+
+                this.rotation += 0.2;
+                this.lifetime--;
+
+                // Create particle trail
+                if (Math.random() < 0.8) {
+                    this.particles.push({
+                        x: this.x,
+                        y: this.y,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        life: 20,
+                        size: Math.random() * 5 + 3
+                    });
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    p.size *= 0.95;
+                    if (p.life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                // Remove if out of bounds or lifetime expired
+                if (this.x < -50 || this.x > canvas.width + 50 ||
+                    this.y > groundY || this.lifetime <= 0) {
+                    this.active = false;
+                }
+            }
+
+            draw() {
+                ctx.save();
+
+                // Draw particles first (trail effect)
+                this.particles.forEach(p => {
+                    const alpha = p.life / 20;
+                    switch(this.type) {
+                        case 'fire':
+                            ctx.fillStyle = `rgba(255, ${100 + Math.random() * 100}, 0, ${alpha})`;
+                            break;
+                        case 'ice':
+                            ctx.fillStyle = `rgba(100, 200, 255, ${alpha})`;
+                            break;
+                        case 'earth':
+                            ctx.fillStyle = `rgba(139, 90, 43, ${alpha})`;
+                            break;
+                        case 'dark':
+                            ctx.fillStyle = `rgba(75, 0, 130, ${alpha})`;
+                            break;
+                    }
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // Draw main blast
+                ctx.translate(this.x, this.y);
+
+                if (this.type === 'earth') {
+                    // Draw earth spike
+                    ctx.fillStyle = '#8B4513';
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-10, 20);
+                    ctx.lineTo(-5, 20);
+                    ctx.lineTo(-5, 60);
+                    ctx.lineTo(5, 60);
+                    ctx.lineTo(5, 20);
+                    ctx.lineTo(10, 20);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Add stone texture
+                    ctx.strokeStyle = '#654321';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                } else {
+                    ctx.rotate(this.rotation);
+
+                // Glow effect
+                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
+                switch(this.type) {
+                    case 'fire':
+                        gradient.addColorStop(0, 'rgba(255, 255, 0, 0.8)');
+                        gradient.addColorStop(0.5, 'rgba(255, 100, 0, 0.6)');
+                        gradient.addColorStop(1, 'rgba(255, 0, 0, 0.2)');
+                        break;
+                    case 'ice':
+                        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                        gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.6)');
+                        gradient.addColorStop(1, 'rgba(0, 100, 200, 0.2)');
+                        break;
+                    case 'earth':
+                        gradient.addColorStop(0, 'rgba(255, 220, 100, 0.8)');
+                        gradient.addColorStop(0.5, 'rgba(139, 90, 43, 0.6)');
+                        gradient.addColorStop(1, 'rgba(101, 67, 33, 0.2)');
+                        break;
+                    case 'dark':
+                        gradient.addColorStop(0, 'rgba(150, 0, 255, 0.8)');
+                        gradient.addColorStop(0.5, 'rgba(75, 0, 130, 0.6)');
+                        gradient.addColorStop(1, 'rgba(25, 0, 50, 0.2)');
+                        break;
+                }
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(0, 0, 15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Inner core
+                switch(this.type) {
+                    case 'fire':
+                        ctx.fillStyle = 'rgba(255, 255, 100, 0.9)';
+                        break;
+                    case 'ice':
+                        ctx.fillStyle = 'rgba(200, 230, 255, 0.9)';
+                        break;
+                    case 'earth':
+                        ctx.fillStyle = 'rgba(180, 140, 80, 0.9)';
+                        break;
+                    case 'dark':
+                        ctx.fillStyle = 'rgba(50, 0, 100, 0.9)';
+                        break;
+                }
+                ctx.beginPath();
+                ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                ctx.fill();
+                }
+
+                ctx.restore();
+            }
+        }
+
         // Projectile class
         class Projectile {
             constructor(x, y, direction, owner, damage) {
@@ -612,6 +822,8 @@
                 this.walkCycle = 0;
                 this.isMoving = false;
                 this.isAiming = false;
+                this.magicCooldown = 0;
+                this.magicElement = 'fire'; // default, will be set per player
             }
 
             update() {
@@ -713,6 +925,11 @@
                 // Update bow cooldown
                 if (this.bowCooldown > 0) {
                     this.bowCooldown--;
+                }
+
+                // Update magic cooldown
+                if (this.magicCooldown > 0) {
+                    this.magicCooldown--;
                 }
                 
                 // Update walk animation
@@ -919,6 +1136,42 @@
                 this.bowCooldown = bowSettings.cooldown / 10;
             }
 
+            castMagic(direction) {
+                if (this.magicCooldown > 0 || this.health <= 0) return;
+
+                // Find nearest target for heat-seeking/earth spike
+                let target = null;
+                if (this.magicElement === 'fire' || this.magicElement === 'ice' ||
+                    this.magicElement === 'dark' || this.magicElement === 'earth') {
+                    const players = [player1, player2];
+                    if (playerCount >= 3 && player3) players.push(player3);
+                    if (playerCount === 4 && player4) players.push(player4);
+
+                    let minDistance = Infinity;
+                    for (const p of players) {
+                        if (p !== this && p.health > 0) {
+                            const dist = Math.abs(p.x - this.x) + Math.abs(p.y - this.y);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                target = p;
+                            }
+                        }
+                    }
+                }
+
+                const blast = new MagicBlast(
+                    this.x + this.width/2,
+                    this.y + 40,
+                    direction || this.facing,
+                    this,
+                    this.magicElement,
+                    target
+                );
+                magicBlasts.push(blast);
+
+                this.magicCooldown = magicSettings.cooldown / 10;
+            }
+
             jump() {
                 if (this.onGround && !this.stunned && this.health > 0) {
                     this.velocityY = -this.jumpPower;
@@ -997,6 +1250,7 @@
             switchWeapon: 'q',
             bow: 'e'
         });
+        player1.magicElement = 'fire';
 
         const player2 = new Player(800, '#0000ff', {
             jump: 'ArrowUp',
@@ -1006,6 +1260,7 @@
             switchWeapon: '/',
             bow: '.'
         });
+        player2.magicElement = 'ice';
 
         // Player 3 and 4 will be created when their modes are selected
 
@@ -1030,6 +1285,17 @@
                 player3.switchWeapon();
                 document.getElementById('weapon3').textContent =
                     player3.currentWeapon.charAt(0).toUpperCase() + player3.currentWeapon.slice(1);
+            }
+
+            // Magic casting (hold bow key + press switch weapon key)
+            if (keys[player1.controls.bow] && e.key.toLowerCase() === player1.controls.switchWeapon) {
+                player1.castMagic();
+            }
+            if (keys[player2.controls.bow] && e.key === player2.controls.switchWeapon) {
+                player2.castMagic();
+            }
+            if (playerCount >= 3 && player3 && keys[player3.controls.bow] && e.key.toLowerCase() === player3.controls.switchWeapon) {
+                player3.castMagic();
             }
         });
 
@@ -1104,6 +1370,11 @@
                 player4.switchWeapon();
                 document.getElementById('weapon4').textContent =
                     player4.currentWeapon.charAt(0).toUpperCase() + player4.currentWeapon.slice(1);
+            }
+
+            // Occasionally cast magic
+            if (Math.random() < 0.01 && player4.magicCooldown <= 0) {
+                player4.castMagic();
             }
         }
 
@@ -1204,8 +1475,28 @@
                     }
                 }
             }
+
+            // Check magic blast collisions
+            for (let i = magicBlasts.length - 1; i >= 0; i--) {
+                const blast = magicBlasts[i];
+
+                // Check collision with all players except owner
+                for (const player of players) {
+                    if (player !== blast.owner && player.health > 0) {
+                        if (blast.x < player.x + player.width &&
+                            blast.x + blast.width > player.x &&
+                            blast.y < player.y + player.height &&
+                            blast.y + blast.height > player.y) {
+                            player.takeDamage(blast.damage);
+                            createHitEffect(player.x + player.width/2, player.y + player.height/2);
+                            magicBlasts.splice(i, 1);
+                            break;
+                        }
+                    }
+                }
+            }
         }
-        
+
         function checkProjectileHit(proj, player) {
             return proj.x < player.x + player.width &&
                    proj.x + proj.width > player.x &&
@@ -1303,6 +1594,7 @@
                     switchWeapon: 'u',
                     bow: 'o'
                 });
+                player3.magicElement = 'earth';
             }
 
             // Create player 4 (AI) if needed
@@ -1317,6 +1609,7 @@
                     bow: ''
                 });
                 player4.isAI = true;
+                player4.magicElement = 'dark';
             }
         }
 
@@ -1410,8 +1703,9 @@
                 player4.hitConfirmed = false;
             }
             
-            // Clear projectiles and effects
+            // Clear projectiles, magic and effects
             projectiles.length = 0;
+            magicBlasts.length = 0;
             hitEffects.length = 0;
             
             gameRunning = true;
@@ -1480,8 +1774,9 @@
                 player4.hitConfirmed = false;
             }
             
-            // Clear projectiles and effects
+            // Clear projectiles, magic and effects
             projectiles.length = 0;
+            magicBlasts.length = 0;
             hitEffects.length = 0;
             
             gameRunning = true;
@@ -1555,6 +1850,14 @@
                     projectiles.splice(i, 1);
                 }
             }
+
+            // Update magic blasts
+            for (let i = magicBlasts.length - 1; i >= 0; i--) {
+                magicBlasts[i].update();
+                if (!magicBlasts[i].active) {
+                    magicBlasts.splice(i, 1);
+                }
+            }
             
             // Update hit effects
             for (let i = hitEffects.length - 1; i >= 0; i--) {
@@ -1598,6 +1901,9 @@
             
             // Draw projectiles
             projectiles.forEach(proj => proj.draw());
+
+            // Draw magic blasts
+            magicBlasts.forEach(blast => blast.draw());
             
             // Draw hit effects
             hitEffects.forEach(effect => effect.draw());
