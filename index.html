@@ -86,6 +86,19 @@
             background: rgba(100, 126, 234, 0.5);
             border: 2px solid #667eea;
         }
+
+        .color-option {
+            padding: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
         
         .map-name {
             font-size: 24px;
@@ -229,9 +242,35 @@
         <h1>Medieval Stick Fighter</h1>
         <div class="player-selection" id="playerSelection">
             <h3>Select Number of Players:</h3>
+            <button class="menu-button" onclick="selectPlayerCount(1)">1 Player</button>
             <button class="menu-button" onclick="selectPlayerCount(2)">2 Players</button>
             <button class="menu-button" onclick="selectPlayerCount(3)">3 Players</button>
-            <button class="menu-button" onclick="selectPlayerCount(4)">4 Players (with AI)</button>
+        </div>
+        <div class="ai-selection" id="aiSelection" style="display: none;">
+            <h3>Add AI Opponent?</h3>
+            <button class="menu-button" onclick="addAI(true)">Add AI</button>
+            <button class="menu-button" onclick="addAI(false)">No AI</button>
+        </div>
+        <div class="color-selection" id="colorSelection" style="display: none;">
+            <h3>Choose Your Color:</h3>
+            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                <div class="color-option" onclick="selectColor('red')" style="background: rgba(220, 20, 60, 0.5);">
+                    <div style="color: #dc143c; font-size: 24px; margin-bottom: 10px;">Red</div>
+                    <div style="color: white; font-size: 14px;">Fire Magic</div>
+                </div>
+                <div class="color-option" onclick="selectColor('blue')" style="background: rgba(0, 0, 255, 0.5);">
+                    <div style="color: #0000ff; font-size: 24px; margin-bottom: 10px;">Blue</div>
+                    <div style="color: white; font-size: 14px;">Ice Magic</div>
+                </div>
+                <div class="color-option" onclick="selectColor('green')" style="background: rgba(34, 139, 34, 0.5);">
+                    <div style="color: #228B22; font-size: 24px; margin-bottom: 10px;">Green</div>
+                    <div style="color: white; font-size: 14px;">Earth Magic</div>
+                </div>
+                <div class="color-option" onclick="selectColor('brown')" style="background: rgba(101, 67, 33, 0.5);">
+                    <div style="color: #654321; font-size: 24px; margin-bottom: 10px;">Brown</div>
+                    <div style="color: white; font-size: 14px;">Dark Magic</div>
+                </div>
+            </div>
         </div>
         <div class="map-selection" style="display: none;" id="mapSelection">
             <h3>Select Map:</h3>
@@ -254,28 +293,28 @@
     <div class="game-container" id="gameContainer">
         <div class="game-info">
             <div class="player-info player1">
-                <div>Player 1</div>
+                <div id="player1">Player 1</div>
                 <div class="health-bar">
                     <div class="health-fill" id="health1"></div>
                 </div>
                 <div class="weapon-indicator" id="weapon1">Sword</div>
             </div>
             <div class="player-info player2">
-                <div>Player 2</div>
+                <div id="player2">Player 2</div>
                 <div class="health-bar">
                     <div class="health-fill" id="health2"></div>
                 </div>
                 <div class="weapon-indicator" id="weapon2">Sword</div>
             </div>
             <div class="player-info player3" id="player3Info" style="display: none;">
-                <div>Player 3</div>
+                <div id="player3">Player 3</div>
                 <div class="health-bar">
                     <div class="health-fill" id="health3"></div>
                 </div>
                 <div class="weapon-indicator" id="weapon3">Sword</div>
             </div>
             <div class="player-info player4" id="player4Info" style="display: none;">
-                <div>Player 4 (AI)</div>
+                <div id="player4">Player 4</div>
                 <div class="health-bar">
                     <div class="health-fill" id="health4"></div>
                 </div>
@@ -338,6 +377,16 @@
         let playerCount = 2;
         let player3 = null;
         let player4 = null;
+        let hasAI = false;
+        let humanPlayerCount = 2;
+        let playerColors = [];
+        let lastInputTime = 0;
+        let colorMap = {
+            'red': { color: '#dc143c', magic: 'fire' },
+            'blue': { color: '#0000ff', magic: 'ice' },
+            'green': { color: '#228B22', magic: 'earth' },
+            'brown': { color: '#654321', magic: 'dark' }
+        };
         
         // Platform class for platform maps
         class Platform {
@@ -404,6 +453,12 @@
         // Projectile arrays
         const projectiles = [];
         const magicBlasts = [];
+
+        // Earthquake state
+        let earthquakeActive = false;
+        let earthquakeTimer = 0;
+        let earthquakeCaster = null;
+        let screenShake = 0;
         
         // Hit effects array
         const hitEffects = [];
@@ -550,53 +605,35 @@
                 this.particles = [];
                 this.lifetime = 100;
                 this.target = target;
+                this.hasHit = false; // Track if spike has hit someone
 
-                // For earth spikes
-                if (this.type === 'earth' && target) {
-                    this.x = target.x + target.width/2;
-                    this.y = groundY;
-                    this.velocityX = 0;
-                    this.velocityY = -15; // Spike shoots up
-                    this.width = 20;
-                    this.height = 60;
-                }
+                // Earth no longer creates projectiles (uses earthquake instead)
             }
 
             update() {
-                if (this.type === 'earth') {
-                    // Earth spike behavior
-                    this.y += this.velocityY;
-                    this.velocityY += 0.5; // Slow down as it rises
+                // Heat-seeking for fire, ice, and dark (earth no longer uses projectiles)
+                if ((this.type === 'fire' || this.type === 'ice' || this.type === 'dark') && this.target && this.target.health > 0) {
+                    const dx = (this.target.x + this.target.width/2) - this.x;
+                    const dy = (this.target.y + this.target.height/2) - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
 
-                    if (this.velocityY > 0) {
-                        // Start falling back down
-                        this.active = false;
-                    }
-                } else {
-                    // Heat-seeking for fire, ice, and dark
-                    if ((this.type === 'fire' || this.type === 'ice' || this.type === 'dark') && this.target && this.target.health > 0) {
-                        const dx = (this.target.x + this.target.width/2) - this.x;
-                        const dy = (this.target.y + this.target.height/2) - this.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance > 5) {
+                        // Adjust velocity to track target
+                        const trackingSpeed = 0.15; // How aggressively it tracks
+                        this.velocityX += (dx / distance) * trackingSpeed * magicSettings.speed;
+                        this.velocityY += (dy / distance) * trackingSpeed * magicSettings.speed;
 
-                        if (distance > 5) {
-                            // Adjust velocity to track target
-                            const trackingSpeed = 0.15; // How aggressively it tracks
-                            this.velocityX += (dx / distance) * trackingSpeed * magicSettings.speed;
-                            this.velocityY += (dy / distance) * trackingSpeed * magicSettings.speed;
-
-                            // Limit max speed
-                            const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
-                            if (currentSpeed > magicSettings.speed * 1.5) {
-                                this.velocityX = (this.velocityX / currentSpeed) * magicSettings.speed * 1.5;
-                                this.velocityY = (this.velocityY / currentSpeed) * magicSettings.speed * 1.5;
-                            }
+                        // Limit max speed
+                        const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+                        if (currentSpeed > magicSettings.speed * 1.5) {
+                            this.velocityX = (this.velocityX / currentSpeed) * magicSettings.speed * 1.5;
+                            this.velocityY = (this.velocityY / currentSpeed) * magicSettings.speed * 1.5;
                         }
                     }
-
-                    this.x += this.velocityX;
-                    this.y += this.velocityY;
                 }
+
+                this.x += this.velocityX;
+                this.y += this.velocityY;
 
                 this.rotation += 0.2;
                 this.lifetime--;
@@ -660,26 +697,7 @@
                 // Draw main blast
                 ctx.translate(this.x, this.y);
 
-                if (this.type === 'earth') {
-                    // Draw earth spike
-                    ctx.fillStyle = '#8B4513';
-                    ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    ctx.lineTo(-10, 20);
-                    ctx.lineTo(-5, 20);
-                    ctx.lineTo(-5, 60);
-                    ctx.lineTo(5, 60);
-                    ctx.lineTo(5, 20);
-                    ctx.lineTo(10, 20);
-                    ctx.closePath();
-                    ctx.fill();
-
-                    // Add stone texture
-                    ctx.strokeStyle = '#654321';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                } else {
-                    ctx.rotate(this.rotation);
+                ctx.rotate(this.rotation);
 
                 // Glow effect
                 const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
@@ -729,7 +747,6 @@
                 ctx.beginPath();
                 ctx.arc(0, 0, 8, 0, Math.PI * 2);
                 ctx.fill();
-                }
 
                 ctx.restore();
             }
@@ -819,6 +836,13 @@
                 this.stunTimer = 0;
                 this.hitConfirmed = false;
                 this.bowCooldown = 0;
+                this.slowed = false;
+                this.slowTimer = 0;
+                this.burning = false;
+                this.burnTimer = 0;
+                this.burnDamageTimer = 0;
+                this.lastDarkCastTime = 0;
+                this.darkMagicStreak = 0;
                 this.walkCycle = 0;
                 this.isMoving = false;
                 this.isAiming = false;
@@ -856,6 +880,31 @@
                     this.stunTimer--;
                     if (this.stunTimer <= 0) {
                         this.stunned = false;
+                    }
+                }
+
+                // Update slow effect
+                if (this.slowed) {
+                    this.slowTimer--;
+                    if (this.slowTimer <= 0) {
+                        this.slowed = false;
+                    }
+                }
+
+                // Update burn effect
+                if (this.burning) {
+                    this.burnTimer--;
+                    this.burnDamageTimer++;
+
+                    // Take burn damage every 20 frames
+                    if (this.burnDamageTimer >= 20) {
+                        this.takeDamage(3, true); // 3 damage per tick, bypass stun
+                        this.burnDamageTimer = 0;
+                    }
+
+                    if (this.burnTimer <= 0) {
+                        this.burning = false;
+                        this.burnDamageTimer = 0;
                     }
                 }
 
@@ -951,7 +1000,24 @@
                 // Draw stick figure body
                 const opacity = this.health <= 0 ? 0.3 : 1;
                 ctx.globalAlpha = opacity;
-                ctx.strokeStyle = this.stunned ? 'gray' : this.color;
+
+                // Change color based on status
+                let drawColor = this.color;
+                if (this.stunned) {
+                    drawColor = 'gray';
+                } else if (this.slowed) {
+                    drawColor = '#87CEEB'; // Light blue tint when slowed
+                }
+
+                // Draw burn effect
+                if (this.burning) {
+                    ctx.fillStyle = 'rgba(255, 100, 0, 0.3)';
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width/2, this.y + this.height/2, 40, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.strokeStyle = drawColor;
                 ctx.lineWidth = 3;
                 ctx.lineCap = 'round';
 
@@ -1137,7 +1203,27 @@
             }
 
             castMagic(direction) {
-                if (this.magicCooldown > 0 || this.health <= 0) return;
+                // Dark magic has no cooldown but always self-damages
+                if (this.magicElement !== 'dark' && this.magicCooldown > 0) return;
+                if (this.health <= 0) return;
+
+                // Dark magic always causes self-damage
+                if (this.magicElement === 'dark') {
+                    this.takeDamage(10, true); // 10 self-damage every cast
+                    createHitEffect(this.x + this.width/2, this.y + this.height/2);
+                }
+
+                // Earth magic triggers earthquake instead of projectile
+                if (this.magicElement === 'earth') {
+                    if (!earthquakeActive) {
+                        earthquakeActive = true;
+                        earthquakeTimer = 90; // 1.5 seconds at 60fps
+                        earthquakeCaster = this;
+                        screenShake = 10;
+                    }
+                    this.magicCooldown = magicSettings.cooldown / 10;
+                    return; // Don't create a projectile
+                }
 
                 // Find nearest target for heat-seeking/earth spike
                 let target = null;
@@ -1169,7 +1255,10 @@
                 );
                 magicBlasts.push(blast);
 
-                this.magicCooldown = magicSettings.cooldown / 10;
+                // Dark magic has no cooldown
+                if (this.magicElement !== 'dark') {
+                    this.magicCooldown = magicSettings.cooldown / 10;
+                }
             }
 
             jump() {
@@ -1180,14 +1269,16 @@
 
             moveLeft() {
                 if (!this.stunned && this.health > 0) {
-                    this.velocityX = -this.speed;
+                    const speedMod = this.slowed ? 0.5 : 1;
+                    this.velocityX = -this.speed * speedMod;
                     this.facing = -1;
                 }
             }
 
             moveRight() {
                 if (!this.stunned && this.health > 0) {
-                    this.velocityX = this.speed;
+                    const speedMod = this.slowed ? 0.5 : 1;
+                    this.velocityX = this.speed * speedMod;
                     this.facing = 1;
                 }
             }
@@ -1204,14 +1295,16 @@
                 this.currentWeapon = weaponNames[this.currentWeaponIndex];
             }
 
-            takeDamage(damage) {
+            takeDamage(damage, bypassStun = false) {
                 this.health -= damage;
                 if (this.health < 0) this.health = 0;
-                this.stunned = true;
-                this.stunTimer = 10;
-                // Knockback
-                this.velocityX = -this.facing * 5;
-                this.velocityY = -5;
+                if (!bypassStun) {
+                    this.stunned = true;
+                    this.stunTimer = 10;
+                    // Knockback
+                    this.velocityX = -this.facing * 5;
+                    this.velocityY = -5;
+                }
             }
 
             getWeaponHitbox() {
@@ -1269,32 +1362,33 @@
 
         document.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
+            lastInputTime = Date.now(); // Track when human input happens
             
-            // Weapon switching
-            if (e.key.toLowerCase() === player1.controls.switchWeapon) {
+            // Weapon switching (only for non-AI players)
+            if (!player1.isAI && e.key.toLowerCase() === player1.controls.switchWeapon) {
                 player1.switchWeapon();
                 document.getElementById('weapon1').textContent =
                     player1.currentWeapon.charAt(0).toUpperCase() + player1.currentWeapon.slice(1);
             }
-            if (e.key === player2.controls.switchWeapon) {
+            if (!player2.isAI && e.key === player2.controls.switchWeapon) {
                 player2.switchWeapon();
                 document.getElementById('weapon2').textContent =
                     player2.currentWeapon.charAt(0).toUpperCase() + player2.currentWeapon.slice(1);
             }
-            if (playerCount >= 3 && player3 && e.key.toLowerCase() === player3.controls.switchWeapon) {
+            if (playerCount >= 3 && player3 && !player3.isAI && e.key.toLowerCase() === player3.controls.switchWeapon) {
                 player3.switchWeapon();
                 document.getElementById('weapon3').textContent =
                     player3.currentWeapon.charAt(0).toUpperCase() + player3.currentWeapon.slice(1);
             }
 
-            // Magic casting (hold bow key + press switch weapon key)
-            if (keys[player1.controls.bow] && e.key.toLowerCase() === player1.controls.switchWeapon) {
+            // Magic casting (hold bow key + press switch weapon key) - only for non-AI
+            if (!player1.isAI && keys[player1.controls.bow] && e.key.toLowerCase() === player1.controls.switchWeapon) {
                 player1.castMagic();
             }
-            if (keys[player2.controls.bow] && e.key === player2.controls.switchWeapon) {
+            if (!player2.isAI && keys[player2.controls.bow] && e.key === player2.controls.switchWeapon) {
                 player2.castMagic();
             }
-            if (playerCount >= 3 && player3 && keys[player3.controls.bow] && e.key.toLowerCase() === player3.controls.switchWeapon) {
+            if (playerCount >= 3 && player3 && !player3.isAI && keys[player3.controls.bow] && e.key.toLowerCase() === player3.controls.switchWeapon) {
                 player3.castMagic();
             }
         });
@@ -1328,93 +1422,119 @@
         }
 
         function updateAI() {
-            if (!player4 || !player4.isAI || player4.health <= 0) return;
+            // Check all players for AI
+            const aiPlayers = [];
+            if (player1 && player1.isAI) aiPlayers.push(player1);
+            if (player2 && player2.isAI) aiPlayers.push(player2);
+            if (player3 && player3.isAI) aiPlayers.push(player3);
+            if (player4 && player4.isAI) aiPlayers.push(player4);
 
-            const target = getNearestTarget(player4);
-            if (!target) return;
+            aiPlayers.forEach(aiPlayer => {
+                if (aiPlayer.health <= 0) return;
 
-            const dx = target.x - player4.x;
-            const dy = target.y - player4.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
+                const target = getNearestTarget(aiPlayer);
+                if (!target) return;
 
-            // Movement AI
-            if (distance > 100) {
-                // Move towards nearest enemy
-                if (dx > 10) {
-                    player4.moveRight();
-                } else if (dx < -10) {
-                    player4.moveLeft();
+                const dx = target.x - aiPlayer.x;
+                const dy = target.y - aiPlayer.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Movement AI
+                if (distance > 100) {
+                    // Move towards nearest enemy
+                    if (dx > 10) {
+                        aiPlayer.moveRight();
+                    } else if (dx < -10) {
+                        aiPlayer.moveLeft();
+                    }
                 }
-            }
 
-            // Jump if target is above
-            if (dy < -50 && player4.onGround && Math.random() < 0.1) {
-                player4.jump();
-            }
-
-            // Combat AI
-            if (distance < 80) {
-                // Attack when close
-                if (Math.random() < 0.15) {
-                    player4.attack();
+                // Jump if target is above
+                if (dy < -50 && aiPlayer.onGround && Math.random() < 0.1) {
+                    aiPlayer.jump();
                 }
-            } else if (distance < 300 && distance > 150) {
-                // Use bow at medium range
-                if (player4.bowCooldown <= 0 && Math.random() < 0.05) {
-                    player4.shootBow(target);
+
+                // Combat AI
+                if (distance < 80) {
+                    // Attack when close
+                    if (Math.random() < 0.15) {
+                        aiPlayer.attack();
+                    }
+                } else if (distance < 300 && distance > 150) {
+                    // Use bow at medium range
+                    if (aiPlayer.bowCooldown <= 0 && Math.random() < 0.05) {
+                        aiPlayer.shootBow(target);
+                    }
                 }
-            }
 
-            // Randomly switch weapons
-            if (Math.random() < 0.005) {
-                player4.switchWeapon();
-                document.getElementById('weapon4').textContent =
-                    player4.currentWeapon.charAt(0).toUpperCase() + player4.currentWeapon.slice(1);
-            }
+                // Randomly switch weapons
+                if (Math.random() < 0.005) {
+                    aiPlayer.switchWeapon();
+                    // Update weapon display for the right AI player
+                    if (aiPlayer === player1) {
+                        document.getElementById('weapon1').textContent =
+                            aiPlayer.currentWeapon.charAt(0).toUpperCase() + aiPlayer.currentWeapon.slice(1);
+                    } else if (aiPlayer === player2) {
+                        document.getElementById('weapon2').textContent =
+                            aiPlayer.currentWeapon.charAt(0).toUpperCase() + aiPlayer.currentWeapon.slice(1);
+                    } else if (aiPlayer === player3) {
+                        document.getElementById('weapon3').textContent =
+                            aiPlayer.currentWeapon.charAt(0).toUpperCase() + aiPlayer.currentWeapon.slice(1);
+                    } else if (aiPlayer === player4) {
+                        document.getElementById('weapon4').textContent =
+                            aiPlayer.currentWeapon.charAt(0).toUpperCase() + aiPlayer.currentWeapon.slice(1);
+                    }
+                }
 
-            // Occasionally cast magic
-            if (Math.random() < 0.01 && player4.magicCooldown <= 0) {
-                player4.castMagic();
-            }
+                // Occasionally cast magic (more often for dark magic since no cooldown)
+                const magicChance = aiPlayer.magicElement === 'dark' ? 0.02 : 0.01;
+                if (Math.random() < magicChance && (aiPlayer.magicElement === 'dark' || aiPlayer.magicCooldown <= 0)) {
+                    aiPlayer.castMagic();
+                }
+            });
         }
 
         function handleInput() {
-            // Player 1 controls
-            if (keys[player1.controls.jump]) player1.jump();
-            if (keys[player1.controls.left]) player1.moveLeft();
-            if (keys[player1.controls.right]) player1.moveRight();
-            if (keys[player1.controls.attack]) player1.attack();
+            // Player 1 controls (only if not AI)
+            if (!player1.isAI) {
+                if (keys[player1.controls.jump]) player1.jump();
+                if (keys[player1.controls.left]) player1.moveLeft();
+                if (keys[player1.controls.right]) player1.moveRight();
+                if (keys[player1.controls.attack]) player1.attack();
             
-            // Handle bow for player 1
-            if (keys[player1.controls.bow]) {
-                if (!player1.isAiming) {
-                    player1.isAiming = true;
+                // Handle bow for player 1
+                if (keys[player1.controls.bow]) {
+                    if (!player1.isAiming) {
+                        player1.isAiming = true;
+                    }
+                } else if (player1.isAiming) {
+                    const target = getNearestTarget(player1);
+                    if (target) player1.shootBow(target);
+                    player1.isAiming = false;
                 }
-            } else if (player1.isAiming) {
-                const target = playerCount === 3 ? getNearestTarget(player1) : player2;
-                player1.shootBow(target);
-                player1.isAiming = false;
             }
 
-            // Player 2 controls
-            if (keys[player2.controls.jump.toLowerCase()]) player2.jump();
-            if (keys[player2.controls.left.toLowerCase()]) player2.moveLeft();
-            if (keys[player2.controls.right.toLowerCase()]) player2.moveRight();
-            if (keys[player2.controls.attack.toLowerCase()]) player2.attack();
+            // Player 2 controls (only if not AI)
+            if (!player2.isAI) {
+                if (keys[player2.controls.jump.toLowerCase()]) player2.jump();
+                if (keys[player2.controls.left.toLowerCase()]) player2.moveLeft();
+                if (keys[player2.controls.right.toLowerCase()]) player2.moveRight();
+                if (keys[player2.controls.attack.toLowerCase()]) player2.attack();
             
-            // Handle bow for player 2
-            if (keys[player2.controls.bow]) {
-                if (!player2.isAiming) {
-                    player2.isAiming = true;
+                // Handle bow for player 2
+                if (keys[player2.controls.bow]) {
+                    if (!player2.isAiming) {
+                        player2.isAiming = true;
+                    }
+                } else if (player2.isAiming) {
+                    const target = getNearestTarget(player2);
+                    if (target) player2.shootBow(target);
+                    player2.isAiming = false;
                 }
-            } else if (player2.isAiming) {
-                const target = playerCount === 3 ? getNearestTarget(player2) : player1;
-                player2.shootBow(target);
-                player2.isAiming = false;
             }
 
-            // Player 3 controls (if active)
-            if (playerCount >= 3 && player3) {
+            // Player 3 controls (if active and not AI)
+            if (playerCount >= 3 && player3 && !player3.isAI) {
                 if (keys[player3.controls.jump]) player3.jump();
                 if (keys[player3.controls.left]) player3.moveLeft();
                 if (keys[player3.controls.right]) player3.moveRight();
@@ -1427,7 +1547,7 @@
                     }
                 } else if (player3.isAiming) {
                     const target = getNearestTarget(player3);
-                    player3.shootBow(target);
+                    if (target) player3.shootBow(target);
                     player3.isAiming = false;
                 }
             }
@@ -1487,9 +1607,31 @@
                             blast.x + blast.width > player.x &&
                             blast.y < player.y + player.height &&
                             blast.y + blast.height > player.y) {
-                            player.takeDamage(blast.damage);
-                            createHitEffect(player.x + player.width/2, player.y + player.height/2);
-                            magicBlasts.splice(i, 1);
+
+                            // For earth spikes, don't remove immediately - let animation finish
+                            if (blast.type !== 'earth') {
+                                player.takeDamage(blast.damage);
+
+                                // Apply magic effects
+                                if (blast.type === 'ice') {
+                                    player.slowed = true;
+                                    player.slowTimer = 100; // Slow for ~1.5 seconds
+                                } else if (blast.type === 'fire') {
+                                    player.burning = true;
+                                    player.burnTimer = 150; // Burn for ~2.5 seconds
+                                    player.burnDamageTimer = 0;
+                                }
+
+                                createHitEffect(player.x + player.width/2, player.y + player.height/2);
+                                magicBlasts.splice(i, 1);
+                            } else {
+                                // Earth spike - damage once but keep animating
+                                if (!blast.hasHit) {
+                                    player.takeDamage(blast.damage);
+                                    createHitEffect(player.x + player.width/2, player.y + player.height/2);
+                                    blast.hasHit = true; // Mark as hit to prevent multiple damage
+                                }
+                            }
                             break;
                         }
                     }
@@ -1580,13 +1722,121 @@
         }
 
         function selectPlayerCount(count) {
+            humanPlayerCount = count;
             playerCount = count;
+            playerColors = [];
             document.getElementById('playerSelection').style.display = 'none';
-            document.getElementById('mapSelection').style.display = 'block';
 
-            // Create player 3 if needed
-            if (playerCount >= 3) {
-                player3 = new Player(500, '#228B22', {
+            if (count === 1) {
+                // 1 player always needs AI
+                hasAI = true;
+                playerCount = 2;
+                document.getElementById('colorSelection').style.display = 'block';
+            } else {
+                // 2 or 3 players - ask about AI
+                document.getElementById('aiSelection').style.display = 'block';
+            }
+        }
+
+        function addAI(wantAI) {
+            hasAI = wantAI;
+            if (hasAI) {
+                playerCount = humanPlayerCount + 1;
+            } else {
+                playerCount = humanPlayerCount;
+            }
+            document.getElementById('aiSelection').style.display = 'none';
+            document.getElementById('colorSelection').style.display = 'block';
+        }
+
+        function selectColor(color) {
+            playerColors.push(color);
+
+            // Check if we need more color selections
+            if (playerColors.length < humanPlayerCount) {
+                // Update the prompt for next player
+                document.querySelector('#colorSelection h3').textContent = `Player ${playerColors.length + 1} - Choose Your Color:`;
+                // Hide the selected color option
+                document.querySelectorAll('.color-option').forEach(option => {
+                    const colorName = option.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if (playerColors.includes(colorName)) {
+                        option.style.opacity = '0.3';
+                        option.style.pointerEvents = 'none';
+                    }
+                });
+            } else {
+                // All players have selected colors
+                document.getElementById('colorSelection').style.display = 'none';
+                document.getElementById('mapSelection').style.display = 'block';
+                setupPlayers();
+            }
+        }
+
+        function setupPlayers() {
+            // Reset all players beyond player 1 and 2
+            player3 = null;
+            player4 = null;
+
+            // Reconfigure player 1 with selected color
+            player1.color = colorMap[playerColors[0]].color;
+            player1.magicElement = colorMap[playerColors[0]].magic;
+
+            // Setup based on configuration
+            if (humanPlayerCount === 1) {
+                // 1 human vs AI - player 2 is AI
+                player2.isAI = true;
+                // Clear controls for AI
+                player2.controls = {
+                    jump: '',
+                    left: '',
+                    right: '',
+                    attack: '',
+                    switchWeapon: '',
+                    bow: ''
+                };
+                // AI gets a random color from remaining options
+                const aiColors = ['red', 'blue', 'green', 'brown'].filter(c => !playerColors.includes(c));
+                const aiColor = aiColors[Math.floor(Math.random() * aiColors.length)];
+                player2.color = colorMap[aiColor].color;
+                player2.magicElement = colorMap[aiColor].magic;
+            } else if (humanPlayerCount === 2) {
+                // Player 2 is human with selected color
+                player2.isAI = false;
+                // Restore player 2 controls
+                player2.controls = {
+                    jump: 'ArrowUp',
+                    left: 'ArrowLeft',
+                    right: 'ArrowRight',
+                    attack: 'ArrowDown',
+                    switchWeapon: '/',
+                    bow: '.'
+                };
+                player2.color = colorMap[playerColors[1]].color;
+                player2.magicElement = colorMap[playerColors[1]].magic;
+
+                if (hasAI) {
+                    // Add AI as player 3
+                    const aiColors = ['red', 'blue', 'green', 'brown'].filter(c => !playerColors.includes(c));
+                    const aiColor = aiColors[Math.floor(Math.random() * aiColors.length)];
+                    player3 = new Player(500, colorMap[aiColor].color, {
+                        jump: '',
+                        left: '',
+                        right: '',
+                        attack: '',
+                        switchWeapon: '',
+                        bow: ''
+                    });
+                    player3.isAI = true;
+                    player3.magicElement = colorMap[aiColor].magic;
+                }
+            } else if (humanPlayerCount === 3) {
+                // Player 2 is human with selected color
+                player2.isAI = false;
+                player2.color = colorMap[playerColors[1]].color;
+                player2.magicElement = colorMap[playerColors[1]].magic;
+
+                // Player 3 is human with selected color
+                player3 = new Player(500, colorMap[playerColors[2]].color, {
                     jump: 'i',
                     left: 'j',
                     right: 'l',
@@ -1594,22 +1844,24 @@
                     switchWeapon: 'u',
                     bow: 'o'
                 });
-                player3.magicElement = 'earth';
-            }
+                player3.isAI = false;
+                player3.magicElement = colorMap[playerColors[2]].magic;
 
-            // Create player 4 (AI) if needed
-            if (playerCount === 4) {
-                player4 = new Player(700, '#654321', {
-                    // AI doesn't use keyboard controls
-                    jump: '',
-                    left: '',
-                    right: '',
-                    attack: '',
-                    switchWeapon: '',
-                    bow: ''
-                });
-                player4.isAI = true;
-                player4.magicElement = 'dark';
+                if (hasAI) {
+                    // Add AI as player 4
+                    const aiColors = ['red', 'blue', 'green', 'brown'].filter(c => !playerColors.includes(c));
+                    const aiColor = aiColors[Math.floor(Math.random() * aiColors.length)];
+                    player4 = new Player(700, colorMap[aiColor].color, {
+                        jump: '',
+                        left: '',
+                        right: '',
+                        attack: '',
+                        switchWeapon: '',
+                        bow: ''
+                    });
+                    player4.isAI = true;
+                    player4.magicElement = colorMap[aiColor].magic;
+                }
             }
         }
 
@@ -1626,18 +1878,66 @@
             document.getElementById('mainMenu').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'block';
 
-            // Show/hide player 3 and 4 UI elements
-            if (playerCount >= 3) {
+            // Show/hide UI elements based on players
+            // Update player 1 display
+            const getColorName = (color) => {
+                for (let [name, data] of Object.entries(colorMap)) {
+                    if (data.color === color) return name.charAt(0).toUpperCase() + name.slice(1);
+                }
+                return 'Player';
+            };
+
+            const getColorClass = (color) => {
+                for (let [name, data] of Object.entries(colorMap)) {
+                    if (data.color === color) {
+                        if (name === 'red') return 'rgba(220, 20, 60, 0.3)';
+                        if (name === 'blue') return 'rgba(0, 0, 255, 0.3)';
+                        if (name === 'green') return 'rgba(0, 255, 0, 0.3)';
+                        if (name === 'brown') return 'rgba(101, 67, 33, 0.5)';
+                    }
+                }
+                return 'rgba(128, 128, 128, 0.3)';
+            };
+
+            // Update player 1
+            document.getElementById('player1').innerHTML = getColorName(player1.color) + (player1.isAI ? ' (AI)' : '');
+            document.querySelector('.player1').style.background = getColorClass(player1.color);
+
+            // Player 2 info (always shown)
+            if (player2.isAI) {
+                document.getElementById('player2').innerHTML = getColorName(player2.color) + ' (AI)';
+            } else {
+                document.getElementById('player2').innerHTML = getColorName(player2.color);
+            }
+            document.querySelector('.player2').style.background = getColorClass(player2.color);
+
+            // Player 3
+            if (player3) {
                 document.getElementById('player3Info').style.display = 'block';
-                document.getElementById('player3Controls').style.display = 'block';
+                document.querySelector('.player3').style.background = getColorClass(player3.color);
+                if (player3.isAI) {
+                    document.getElementById('player3Controls').style.display = 'none';
+                    document.getElementById('player3').innerHTML = getColorName(player3.color) + ' (AI)';
+                } else {
+                    document.getElementById('player3Controls').style.display = 'block';
+                    document.getElementById('player3').innerHTML = getColorName(player3.color);
+                }
             } else {
                 document.getElementById('player3Info').style.display = 'none';
                 document.getElementById('player3Controls').style.display = 'none';
             }
 
-            if (playerCount === 4) {
+            // Player 4
+            if (player4) {
                 document.getElementById('player4Info').style.display = 'block';
-                document.getElementById('player4Controls').style.display = 'block';
+                document.querySelector('.player4').style.background = getColorClass(player4.color);
+                if (player4.isAI) {
+                    document.getElementById('player4Controls').style.display = 'none';
+                    document.getElementById('player4').innerHTML = getColorName(player4.color) + ' (AI)';
+                } else {
+                    document.getElementById('player4Controls').style.display = 'block';
+                    document.getElementById('player4').innerHTML = getColorName(player4.color);
+                }
             } else {
                 document.getElementById('player4Info').style.display = 'none';
                 document.getElementById('player4Controls').style.display = 'none';
@@ -1726,6 +2026,15 @@
             // Reset to player selection
             document.getElementById('playerSelection').style.display = 'block';
             document.getElementById('mapSelection').style.display = 'none';
+            document.getElementById('aiSelection').style.display = 'none';
+            document.getElementById('colorSelection').style.display = 'none';
+            // Reset color selections
+            playerColors = [];
+            document.querySelectorAll('.color-option').forEach(option => {
+                option.style.opacity = '1';
+                option.style.pointerEvents = 'auto';
+            });
+            document.querySelector('#colorSelection h3').textContent = 'Choose Your Color:';
         }
         
         function restartGame() {
@@ -1822,14 +2131,49 @@
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            // Apply screen shake for earthquake
+            if (screenShake > 0) {
+                ctx.save();
+                const shakeX = (Math.random() - 0.5) * screenShake;
+                const shakeY = (Math.random() - 0.5) * screenShake;
+                ctx.translate(shakeX, shakeY);
+                screenShake *= 0.95; // Decay shake
+                if (screenShake < 0.1) screenShake = 0;
+            }
+
             // Draw background
             drawBackground();
+
+            // Draw earthquake effect
+            if (earthquakeActive) {
+                // Ground cracks effect
+                ctx.strokeStyle = 'rgba(139, 69, 19, 0.8)';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 5; i++) {
+                    const x = (canvas.width / 5) * i + Math.sin(earthquakeTimer * 0.3 + i) * 20;
+                    ctx.beginPath();
+                    ctx.moveTo(x, groundY);
+                    ctx.lineTo(x + 20, groundY + 30);
+                    ctx.lineTo(x + 10, groundY + 50);
+                    ctx.stroke();
+                }
+
+                // Dust clouds
+                ctx.fillStyle = `rgba(139, 90, 43, ${0.3 * (earthquakeTimer / 90)})`;
+                for (let i = 0; i < canvas.width; i += 50) {
+                    const y = groundY - Math.abs(Math.sin(earthquakeTimer * 0.2 + i * 0.01)) * 20;
+                    ctx.beginPath();
+                    ctx.arc(i, y, 30, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
 
             // Handle input
             handleInput();
 
-            // Update AI
-            if (playerCount === 4) {
+            // Update AI only if there's been recent human input (within last 500ms)
+            // This prevents AI from running when no humans are playing
+            if (Date.now() - lastInputTime < 500) {
                 updateAI();
             }
 
@@ -1864,6 +2208,36 @@
                 hitEffects[i].update();
                 if (!hitEffects[i].active) {
                     hitEffects.splice(i, 1);
+                }
+            }
+
+            // Update earthquake
+            if (earthquakeActive) {
+                earthquakeTimer--;
+
+                // Damage grounded players every 20 frames
+                if (earthquakeTimer % 20 === 0) {
+                    const players = [player1, player2];
+                    if (player3) players.push(player3);
+                    if (player4) players.push(player4);
+
+                    for (const player of players) {
+                        // Skip the caster and dead players
+                        if (player === earthquakeCaster || player.health <= 0) continue;
+
+                        // Only damage if on ground (not jumping or on platform)
+                        if (player.onGround && player.y >= groundY - player.height - 5) {
+                            player.takeDamage(8, true); // 8 damage per tick
+                            createHitEffect(player.x + player.width/2, player.y + player.height);
+                            // Small upward knock
+                            player.velocityY = -3;
+                        }
+                    }
+                }
+
+                if (earthquakeTimer <= 0) {
+                    earthquakeActive = false;
+                    earthquakeCaster = null;
                 }
             }
 
@@ -1911,6 +2285,11 @@
             // Update UI
             updateHealthBars();
             checkGameOver();
+
+            // Restore canvas if shaking
+            if (screenShake > 0) {
+                ctx.restore();
+            }
 
             requestAnimationFrame(gameLoop);
         }
